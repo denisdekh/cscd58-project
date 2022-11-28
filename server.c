@@ -1,43 +1,61 @@
-#include "netutils.h"
-#include <string.h>
-
-#define SERVER_PORT 6777
-#define MAX_PENDING 5
-#define MAX_LINE 256
+#include "server.h"
 
 /* global variables */
 int sfd;                        // fd for socket
 struct sockaddr_in s_addr;      // address struct
 
-/*
- server loop
- return 0: successful server loop
- return 1: terminate loop
-*/
-int handle_connection(int client_socket)
+
+void user_handler(char buf[MAX_LINE], int len)
 {
-    int len;
-    char buf[MAX_LINE];
+    /*
+     TODO: should allow requesting user to login/register
 
-    while (len = recv(client_socket, buf, sizeof(buf), 0)) {
-        // create a buffer to reply to client.
-        // length of buffer is length of received message + length of date string +1 to add a \n in the reply
-        char reply_buf[MAX_LINE] = "Reply from server\n";
+     If the <user> exists in the server and <password> is valid then login as this user.
+     If the <user> does not exist in the server then register a new user with <user>/<password> and login
 
-        send(client_socket, reply_buf, MAX_LINE, 0); // send back to client
+     We can split this into a separate register & login if you want
+    */
 
-        fputs(buf, stdout); // output received message from client to stdout
-    }
+    printf("server: user handler\n");
 }
 
-int server_loop()
+/*
+ regular_handler
+
+ Handles logic to be performed on a regular message request from a user to another user
+*/
+void regular_handler(char buf[MAX_LINE], int len)
+{
+    /*
+     TODO: should somehow send the message from src user to dst user
+     src user should be authenticated
+    */
+
+   printf("server: regular message handler");
+}
+
+void handle_connection(int client_socket)
+{
+    char buf[MAX_LINE];
+    bzero(buf, MAX_LINE);
+
+    int len = recv(client_socket, buf, sizeof(buf), 0);
+    
+    // create a buffer to reply to client.
+    char reply_buf[MAX_LINE] = "Reply from server\n";
+
+    send(client_socket, reply_buf, MAX_LINE, 0); // send back to client
+
+    fputs(buf, stdout); // output received message from client to stdout
+}
+
+void server_loop()
 {
     int client_socket = accept_connection(sfd, &s_addr);
 
     handle_connection(client_socket);
     close(client_socket);
 }
-
 
 int main()
 {    
@@ -67,9 +85,7 @@ int main()
     listen(sfd, MAX_PENDING);
 
     // main server loop
-    while(1) {
-        server_loop();
-    }
+    while (1) server_loop();
 
     close(sfd); // should never get here though
 }
