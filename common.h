@@ -1,5 +1,4 @@
 #include "netutils.h"
-#include <string.h>
 
 #ifndef COMMON_H
 #define COMMON_H

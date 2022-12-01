@@ -2,53 +2,146 @@
 
 /* global variables */
 struct sockaddr_in server_addr;     // server address struct
+char target_user[MAX_LINE];
+struct D58P_auth auth;
 
 void user_handler(char buf[MAX_LINE], int len)
 {
     /*
-     TODO: should communicate with server to somehow identify the client with the server
+     Should communicate with server to somehow identify the client with the server
      Messages of form:
         /user <user> <password>
     */
 
-    printf("user handler\n");
+    const char delim[] = " ";
+    strtok(buf, delim); // command
+    char *user = strtok(NULL, delim); // arg1
+
+    if (user == NULL) {
+        printf("Usage: /user <user> <password>\n");
+        return;
+    }
+
+    char *password = strtok(NULL, delim); // arg2
+
+    if (password == NULL) {
+        printf("Usage: /user <user> <password>\n");
+        return;
+    }
+
+    if (strtok(NULL, delim) != NULL) {
+        printf("Usage: /user <user> <password>\n");
+        return;
+    }
+
+    auth.user_len = strlen(user);
+    auth.password_len = strlen(password);
+
+    strcpy(auth.username, user);
+    strcpy(auth.password, password);
+
+    // dont set \n in username and password
+    auth.user_len += 1;
+    auth.username[auth.user_len-1] = '\0';  // add a \0 to username
+    auth.password[auth.password_len-1] = '\0'; // replace \n with \0
+
+    // build request
+    struct D58P_request req;
+    create_user_request(&req, &auth);
+
+    // create connection to server
+    int sfd = create_connection(&server_addr);
+    
+    // send request
+    send(sfd, req.buf, req.len, 0);
+
+    // response from server
+    char res[MAX_REQUEST];
+    int res_len = recv(sfd, res, MAX_LINE, 0);
+
+    // TODO: do something on response
+    printf("authenticated as %s\n", auth.username);
+
 }
 
 void msg_handler(char buf[MAX_LINE], int len)
 {
     /*
-     TODO: should set a global variable within client so that future messages to regular_handler will send messages
-     to the specified user. (no server communications required)
+     Sets a global variable target_user[MAX_LINE] within client so that future messages to regular_handler will send messages
+     to the specified user.
 
      Messages of form:
         /msg <user>
      
      All further messages should be directed to specified user
     */
-    
-    printf("msg handler\n");
+    const char delim[] = " ";
+    strtok(buf, delim); // command
+    char *user = strtok(NULL, delim); // arg1
+
+    if (strtok(NULL, delim) != NULL) {
+        printf("Usage: /msg <user>\n");
+    } else {
+        if(user == NULL) {
+            printf("Usage: /msg <user>\n");
+            return;
+        }
+
+        strncpy(target_user, user, MAX_LINE);
+        printf("Now chatting with %s", user);
+    }
 }
 
 void regular_handler(char buf[MAX_LINE], int len)
 {
     /*
-     TODO: should communicate with server to somehow send a message to the user the client is chatting with 
-     
+     should communicate with server to send message to user
+
      client should be logged in with /user
      client should be chatting with someone using /msg <user>
     */
 
-    printf("regular handler\n");
+    // build message data
+    struct D58P_message_data data;
 
-    // connect to server
+    // not authenticated
+    if(auth.user_len == 0 || auth.password_len == 0) {
+        printf("Authenticate using /user <user> <password>\n");
+        return;
+    }
+
+    // set target user for message
+    data.target_user_len = strnlen(target_user, MAX_LINE);
+    if (data.target_user_len == 0) {
+        printf("Initiate chat using /msg <user>\n");
+        return;
+    }
+
+    if (len <= 1) return;
+
+    strncpy(data.target_user, target_user, data.target_user_len);
+
+    // set message content
+    memcpy(data.message, buf, len);
+    data.message_len = len;
+
+    // build message request from message data
+    struct D58P_request req;
+    create_message_request(&req, &auth, &data);
+
+    // create connection to server
     int sfd = create_connection(&server_addr);
+    
+    // send request
+    send(sfd, req.buf, req.len, 0);
 
-    send(sfd, buf, len, 0);
+    // response from server
+    char res[MAX_REQUEST];
+    int res_len = recv(sfd, res, MAX_LINE, 0);
+    
 
-    len = recv(sfd, buf, MAX_LINE, 0);
-
-    fputs(buf, stdout);
-
+    // TODO: do something on response
+    printf("sent message \n");
     close(sfd);
 }
 
@@ -130,7 +223,11 @@ int main(int argc, char * argv[])
     server_addr.sin_family = AF_INET; // internet family
     bcopy(hp->h_addr, (char *)&server_addr.sin_addr, hp->h_length); // copy from hp to sin
     server_addr.sin_port = htons(SERVER_PORT); // set server port
-    
+
+    // zero global variables initially
+    bzero((char *) &auth, sizeof(auth));
+    bzero(target_user, sizeof(target_user));
+
     // main client loop
     while (1) client_loop();
 }
