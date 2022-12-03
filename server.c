@@ -3,12 +3,60 @@
 /* global variables */
 int sfd;                        // fd for socket
 struct sockaddr_in s_addr;      // address struct
+struct user *user_list;         // list of authenticated users. notes: temporary solution
 
+
+/*
+ Adds a new user to the linked list of users
+*/
+void register_user(char *username, char *password)
+{
+    struct user *new_user = (struct user*)malloc(sizeof(struct user));
+
+    strncpy(new_user->username, username, MAX_LINE);
+    strncpy(new_user->password, password, MAX_LINE);
+    
+    new_user->next = user_list;
+    user_list = new_user;
+}
+
+/*
+ Returns user struct for specified username if it exists
+*/
+struct user* find_user(char *username)
+{
+    struct user *cur_user = user_list;
+
+    while(cur_user != NULL) {
+        if(strncmp(username, cur_user->username, MAX_LINE) == 0) {
+            return cur_user;
+        }
+    }
+
+    return NULL;
+}
+
+/*
+ Temporary solution to determining if a user is authenticated or not
+
+ Uses global linked list to determine if a user exists or not
+*/
+int is_authenticated(char *username, char *password)
+{
+    struct user *user = find_user(username);
+
+    if(user == NULL) {
+        return 0;
+    }
+
+    return strncmp(password, user->password, MAX_LINE) == 0;
+}
 
 /*
  user_handler
 
  Handles logic to be performed on a user request. (login / register)
+ Currently uses a temporary solution with a global linked list for storing users.
 
  Handles D58P /User requests
 
@@ -18,23 +66,36 @@ struct sockaddr_in s_addr;      // address struct
     <user>
     <password>
 */
-void user_handler(char buf[MAX_REQUEST], int len)
+void user_handler(int client_socket, struct D58P *req, int len)
 {
-    /*
-     TODO: should allow requesting user to login/register
+    struct D58P res;
+    char *username = req->lines[1];
+    char *password = req->lines[2];
 
-     If the <user> exists in the server and <password> is valid then login as this user.
-     If the <user> does not exist in the server then register a new user with <user>/<password> and login
-    */
-
-    printf("server: user handler\n");
-    const char delim[] = "\n";
-    char *token = strtok(buf, delim);
-
-    while(token != NULL) {
-        printf("%s\n", token);
-        token = strtok(NULL, delim);
+    // handle invalid username / password
+    if(username == NULL || strnlen(username, MAX_LINE) == 0) { // invalid username
+        create_response(&res, D58P_USER_STRING_RES, D58P_BAD_REQUEST);
+        send_D58P_response(client_socket, &res);
+        return;
     }
+
+    if(password == NULL || strnlen(password, MAX_LINE) == 0) { // invalid password
+        create_response(&res, D58P_USER_STRING_RES, D58P_BAD_REQUEST);
+        send_D58P_response(client_socket, &res);
+        return;
+    }
+    
+    // perform action
+    if(is_authenticated(username, password)) { // logged in
+        create_response(&res, D58P_USER_STRING_RES, D58P_OK);
+    } else if(find_user(username) == NULL) { // register new user
+        register_user(username, password);
+        create_response(&res, D58P_USER_STRING_RES, D58P_CREATED);
+    } else {  // unauthenticated
+        create_response(&res, D58P_USER_STRING_RES, D58P_UNAUTHORIZED);
+    }
+
+    send_D58P_response(client_socket, &res);
 }
 
 /*
@@ -52,16 +113,10 @@ void user_handler(char buf[MAX_REQUEST], int len)
     <target user>
     <message>
 */
-void regular_handler(char buf[MAX_REQUEST], int len)
+void regular_handler(int client_socket, struct D58P *req, int len)
 {
     printf("server: regular message handler\n");
-    const char delim[] = "\n";
-    char *token = strtok(buf, delim);
-
-    while(token != NULL) {
-        printf("%s\n", token);
-        token = strtok(NULL, delim);
-    }
+    // TODO: send a message somehow
 }
 
 /*
@@ -72,20 +127,21 @@ void handle_connection(int client_socket)
     char buf[MAX_REQUEST];
     bzero(buf, MAX_REQUEST);
 
-    int len = recv(client_socket, buf, sizeof(buf), 0);
+    // recieve data  through socket
+    int len = recv(client_socket, buf, sizeof(buf), 0); 
     
-    // create a buffer to reply to client.
-    const char delim[] = "\n";
+    // parse data as D58P request
+    struct D58P req;
+    parse_D58P_buf(&req, buf);
+    
+    printf("~ Received request ~\n");
+    dump_D58P(&req);
 
-    char buf_cpy[MAX_REQUEST];
-    strncpy(buf_cpy, buf, MAX_REQUEST);
-
-    char *token = strtok(buf_cpy, delim);
-
-    if(strncmp(token, D58P_MESSAGE_STRING, MAX_REQUEST) == 0) {
-        regular_handler(buf, len);
-    } else if (strncmp(token, D58P_USER_STRING, MAX_REQUEST) == 0) {
-        user_handler(buf, len);
+    // Go to request handler
+    if(strncmp(req.lines[0], D58P_MESSAGE_STRING_REQ, MAX_REQUEST) == 0) {
+        regular_handler(client_socket, &req, len);
+    } else if (strncmp(req.lines[0], D58P_USER_STRING_REQ, MAX_REQUEST) == 0) {
+        user_handler(client_socket, &req, len);
     } else {
         char reply_buf[MAX_REQUEST] = "Invalid request\n";
         send(client_socket, reply_buf, MAX_REQUEST, 0); // send back to client
@@ -100,7 +156,6 @@ void handle_connection(int client_socket)
 void server_loop()
 {
     int client_socket = accept_connection(sfd, &s_addr);
-    printf("~ client request ~\n");
     handle_connection(client_socket);
     close(client_socket);
 }

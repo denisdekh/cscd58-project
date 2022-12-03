@@ -24,7 +24,7 @@ void user_handler(char buf[MAX_LINE], int len)
 
     char *password = strtok(NULL, delim); // arg2
 
-    if (password == NULL) {
+    if (password == NULL || strnlen(password, MAX_LINE) == 1) {
         printf("Usage: /user <user> <password>\n");
         return;
     }
@@ -45,23 +45,13 @@ void user_handler(char buf[MAX_LINE], int len)
     auth.username[auth.user_len-1] = '\0';  // add a \0 to username
     auth.password[auth.password_len-1] = '\0'; // replace \n with \0
 
-    // build request
-    struct D58P_request req;
+    // build request   
+    struct D58P req, res;
     create_user_request(&req, &auth);
 
-    // create connection to server
-    int sfd = create_connection(&server_addr);
-    
-    // send request
-    send(sfd, req.buf, req.len, 0);
-
-    // response from server
-    char res[MAX_REQUEST];
-    int res_len = recv(sfd, res, MAX_LINE, 0);
-
-    // TODO: do something on response
-    printf("authenticated as %s\n", auth.username);
-
+    int res_len = send_D58P_request(&server_addr, &req, &res);
+    printf("received response: \n");
+    dump_D58P(&res);
 }
 
 void msg_handler(char buf[MAX_LINE], int len)
@@ -71,7 +61,7 @@ void msg_handler(char buf[MAX_LINE], int len)
      to the specified user.
 
      Messages of form:
-        /msg <user>
+        /msg <recipient>
      
      All further messages should be directed to specified user
     */
@@ -80,14 +70,16 @@ void msg_handler(char buf[MAX_LINE], int len)
     char *user = strtok(NULL, delim); // arg1
 
     if (strtok(NULL, delim) != NULL) {
-        printf("Usage: /msg <user>\n");
+        printf("Usage: /msg <recipient>\n");
     } else {
         if(user == NULL) {
-            printf("Usage: /msg <user>\n");
+            printf("Usage: /msg <recipient>\n");
             return;
         }
 
-        strncpy(target_user, user, MAX_LINE);
+        int target_user_len = strnlen(user, MAX_LINE) - 1; // dont copy the \n at the end
+
+        strncpy(target_user, user, target_user_len);
         printf("Now chatting with %s", user);
     }
 }
@@ -113,7 +105,7 @@ void regular_handler(char buf[MAX_LINE], int len)
     // set target user for message
     data.target_user_len = strnlen(target_user, MAX_LINE);
     if (data.target_user_len == 0) {
-        printf("Initiate chat using /msg <user>\n");
+        printf("Initiate chat using /msg <recipient>\n");
         return;
     }
 
@@ -123,26 +115,16 @@ void regular_handler(char buf[MAX_LINE], int len)
 
     // set message content
     memcpy(data.message, buf, len);
-    data.message_len = len;
+    data.message_len = len - 1; // dont copy the \n at the end
 
     // build message request from message data
-    struct D58P_request req;
+    struct D58P req, res;
     create_message_request(&req, &auth, &data);
 
-    // create connection to server
-    int sfd = create_connection(&server_addr);
+    int res_len = send_D58P_request(&server_addr, &req, &res);
     
-    // send request
-    send(sfd, req.buf, req.len, 0);
-
-    // response from server
-    char res[MAX_REQUEST];
-    int res_len = recv(sfd, res, MAX_LINE, 0);
-    
-
     // TODO: do something on response
     printf("sent message \n");
-    close(sfd);
 }
 
 /*
@@ -227,6 +209,11 @@ int main(int argc, char * argv[])
     // zero global variables initially
     bzero((char *) &auth, sizeof(auth));
     bzero(target_user, sizeof(target_user));
+
+    printf("Chat client started...\n");
+    printf("Please authenticate using /user <user> <password>\n");
+    printf("Then begin chatting with a user using /msg <recipient>\n");
+    printf("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n");
 
     // main client loop
     while (1) client_loop();

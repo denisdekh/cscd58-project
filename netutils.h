@@ -8,48 +8,65 @@
 #define NET_UTILS_H
 
 #define assert(x, msg) if (!(x)) { fprintf(stderr, "%s", msg); exit(EXIT_FAILURE); }
-#define MAX_REQUEST 4096    // maximum # of bytes for request
 
+#define MAX_REQUEST 4096    // maximum # of bytes for request
+#define MAX_LINES 50        // maximum # of lines for request
+#define MAX_LINE 256        // maximum # of bytes per line
 
 /*
  D58P: D58 Protocol definitions
 */
-#define D58P_MESSAGE_STRING "D58P /Message"
-#define D58P_USER_STRING "D58P /User"
+#define D58P_MESSAGE_STRING_REQ "D58P /Message"
+#define D58P_MESSAGE_STRING_RES "D58P \\Message"
+#define D58P_USER_STRING_REQ "D58P /User"
+#define D58P_USER_STRING_RES "D58P \\User"
+#define D58P_ERROR_STRING "D58P \\Error"
 
-enum D58P_RequestType {
-    D58P_Type_Message,      // message to user
-    D58P_Type_User          // login/register
+enum D58P_ResponseCode {
+    D58P_OK=200,
+    D58P_CREATED=201,
+    D58P_BAD_REQUEST=400,
+    D58P_UNAUTHORIZED=401
 };
 
 struct D58P_auth {
     char username[MAX_REQUEST];         // type of request
-    int user_len;               // length of message
+    int user_len;                       // length of message
     
     char password[MAX_REQUEST];         // type of request
-    int password_len;       // length of message
+    int password_len;                   // length of message
 };
-
 
 struct D58P_message_data {
     char target_user[MAX_REQUEST];
     int target_user_len;
     
     char message[MAX_REQUEST];          // type of request
-    int message_len;        // length of message
+    int message_len;                    // length of message
 };
 
-struct D58P_request {
-    char buf[MAX_REQUEST];  // request data
-    int len;                // request length
+/*
+ Represents a D58P request or response
+*/
+struct D58P {
+    char lines[MAX_LINES][MAX_LINE];
 };
 
-
+/* client / server connections */
 int create_connection(struct sockaddr_in *sin);
 int accept_connection(int sfd, struct sockaddr_in *sin);
 
-void create_message_request(struct D58P_request *req, struct D58P_auth *auth, struct D58P_message_data *data);
-void create_user_request(struct D58P_request *req, struct D58P_auth *auth);
+/* Helpers to create D58P data */
+void create_message_request(struct D58P *req, struct D58P_auth *auth, struct D58P_message_data *data);
+void create_user_request(struct D58P *req, struct D58P_auth *auth);
+void create_response(struct D58P *res, char *type, enum D58P_ResponseCode code);
 
+/* Sending / Receiving D58P data */
+int send_D58P_request(struct sockaddr_in *sin, struct D58P *req, struct D58P *res);
+void send_D58P_response(int sfd, struct D58P *res);
+
+/* Other utils */
+void parse_D58P_buf(struct D58P *data, char buf[MAX_REQUEST]);
+void dump_D58P(struct D58P *data);
 
 #endif
