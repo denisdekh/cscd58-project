@@ -128,7 +128,7 @@ int main(int argc, char * argv[])
     // setup server struct
     bzero((char *)&server_addr, sizeof(server_addr)); // erase bytes in sin
     server_addr.sin_family = AF_INET; // internet family
-    bcopy(hp->h_addr, (char *)&server_addr.sin_addr, hp->h_length); // copy from hp to sin
+    bcopy(hp->h_addr_list[0], (char *)&server_addr.sin_addr, hp->h_length); // copy from hp to sin
     server_addr.sin_port = htons(SERVER_PORT); // set server port
     
     // main client loop
