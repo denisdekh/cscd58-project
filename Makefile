@@ -5,7 +5,7 @@ server: server.c
 
 
 client: 
-	gcc ./netutils.c ./encrypt.c ./client.c -g -o client -L/usr/include/openssl
+	gcc -L/usr/include -lopenssl ./netutils.c ./encrypt.c ./client.c -g -o client 
 
 
 

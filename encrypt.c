@@ -65,16 +65,10 @@ int get_keys(RSA *keypair) {
 
 //msg is the pointer to the original message, ciphertext is where the encrypted message will be stored
 int encrypt_message(RSA *rsa, char msg[],unsigned char *ciphertext, int msg_len) {
-    char   *pri_key;           // Private key
-    char   *pub_key;           // Public key
     unsigned char   *encrypt = NULL;    // Encrypted message
     unsigned char   *decrypt = NULL;    // Decrypted message
     char   *err;               // Buffer for any error messages
 
-    #ifdef PRINT_KEYS
-        printf("\n%s\n%s\n", pri_key, pub_key);
-    #endif
-    printf("done.\n");
 
     // Encrypt the message
     unsigned char *plaintext = (unsigned char*) msg;
@@ -86,13 +80,6 @@ int encrypt_message(RSA *rsa, char msg[],unsigned char *ciphertext, int msg_len)
                                         rsa, RSA_PKCS1_OAEP_PADDING)) == -1) {
         log_ssl_err("RSA_public_encrypt failed");
         exit(1);
-    }
-
-    decrypted = malloc(RSA_size(rsa));
-    if ((decrypted_len = RSA_private_decrypt(cipher_len, ciphertext, decrypted, 
-                                            rsa, RSA_PKCS1_OAEP_PADDING)) == -1) {
-        log_ssl_err("RSA_private_decrypt failed");
-        return 0;
     }
     /* 
     #ifdef WRITE_TO_FILE
@@ -134,4 +121,18 @@ int encrypt_message(RSA *rsa, char msg[],unsigned char *ciphertext, int msg_len)
     free(err);
  */
     return 0;
+}
+
+int decrypt_message(RSA *rsa, char ciphertext[], unsigned char *decrypted, int msg_len) {
+    char   *err;               // Buffer for any error messages
+
+    unsigned char *encrypted = (unsigned char *) ciphertext;
+    int decrypted_len;
+
+    decrypted = malloc(RSA_size(rsa));
+    if ((decrypted_len = RSA_private_decrypt(msg_len, encrypted, decrypted, 
+                                            rsa, RSA_PKCS1_OAEP_PADDING)) == -1) {
+        log_ssl_err("RSA_private_decrypt failed");
+        return 0;
+    }
 }

@@ -1,3 +1,4 @@
+#include <openssl/opensslconf.h>
 #include <openssl/rsa.h>
 #include <openssl/pem.h>
 #include <openssl/err.h>
@@ -13,8 +14,6 @@
 
 #define KEY_LENGTH  2048
 #define PUB_EXP     65537   
-#define PRINT_KEYS
-#define WRITE_TO_FILE
 
 bool file_exists (char *filename);
 void log_ssl_err(const char *mes);
