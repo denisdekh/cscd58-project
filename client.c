@@ -4,6 +4,7 @@
 struct sockaddr_in server_addr;     // server address struct
 char target_user[MAX_LINE];
 struct D58P_auth auth;
+RSA *keys;
 
 void user_handler(char buf[MAX_LINE], int len)
 {
@@ -133,6 +134,7 @@ void regular_handler(char buf[MAX_LINE], int len)
 */
 void exit_handler(char buf[MAX_LINE], int len)
 {
+    RSA_free(keys);
     exit(EXIT_SUCCESS);
 }
 
@@ -209,10 +211,15 @@ int main(int argc, char * argv[])
     // zero global variables initially
     bzero((char *) &auth, sizeof(auth));
     bzero(target_user, sizeof(target_user));
+    // get encryption keys
+    if (get_keys(keys)) {
+        fprintf(stderr, "client: could not generate encryption keys");
+        exit(EXIT_FAILURE);
+    }
 
     printf("Chat client started...\n");
     printf("Please authenticate using /user <user> <password>\n");
-    printf("Then begin chatting with a user using /msg <recipient>\n");
+    printf("Then begin chatting with a user using /msg <recipient> <message>\n");
     printf("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n");
 
     // main client loop
