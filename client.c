@@ -6,16 +6,15 @@ char target_user[MAX_LINE];
 struct D58P_auth auth;
 int authenticated;              // client side flag to determine if authenticated
 pthread_t get_msg_tid;
-RSA *keys;
+RSA *keys, *target_key;
 
-void user_handler(char buf[MAX_LINE], int len)
-{
-    /*
+ /*
      Should communicate with server to somehow identify the client with the server
      Messages of form:
         /user <user> <password>
     */
-
+void user_handler(char buf[MAX_LINE], int len)
+{
     const char delim[] = " ";
     strtok(buf, delim); // command
     char *user = strtok(NULL, delim); // arg1
@@ -39,9 +38,29 @@ void user_handler(char buf[MAX_LINE], int len)
 
     auth.user_len = strlen(user);
     auth.password_len = strlen(password);
-
     strcpy(auth.username, user);
     strcpy(auth.password, password);
+    
+    if (get_public(keys, auth.e, auth.n)) {     // get the key and set it
+        fprintf(stderr, "client: could not retrieve the public key\n");
+        exit(EXIT_FAILURE);
+    }
+    /* encryption test
+    RSA *new;
+    get_keys(&new);
+
+    set_public(new, auth.e, auth.n);
+    
+    unsigned char msg[] = "hmm very long msh jdnajdijsahdjashdijsahdisajdasdsadsadsadsadsasadasdssadsadasdasas";
+    unsigned char ciphertext[RSA_size(new)];
+    int cipher_len;
+    encrypt_message(new, msg, ciphertext, strlen(msg), &cipher_len);
+    fprintf(stderr, "client: the original message = '%s' length = %ld\n", msg, strlen(msg));
+
+    unsigned char plaintext[RSA_size(keys)];
+    int plain_len = decrypt_message(keys, ciphertext, plaintext, cipher_len);
+    plaintext[plain_len] = '\0';
+    fprintf(stderr, "client: the decrypted message = '%s' length = %ld\n", plaintext, strlen(plaintext)); */
 
     // dont set \n in username and password
     auth.user_len += 1;
@@ -62,17 +81,16 @@ void user_handler(char buf[MAX_LINE], int len)
     }
 }
 
+/*
+    Sets a global variable target_user[MAX_LINE] within client so that future messages to send_message_handler
+    will send messages to the specified user.
+
+    Messages of form:
+    /msg <recipient>
+    
+    All further messages should be directed to specified user*/
 void msg_handler(char buf[MAX_LINE], int len)
 {
-    /*
-     Sets a global variable target_user[MAX_LINE] within client so that future messages to send_message_handler
-     will send messages to the specified user.
-
-     Messages of form:
-        /msg <recipient>
-     
-     All further messages should be directed to specified user
-    */
     const char delim[] = " ";
     strtok(buf, delim); // command
     char *user = strtok(NULL, delim); // arg1
@@ -88,19 +106,18 @@ void msg_handler(char buf[MAX_LINE], int len)
         int target_user_len = strnlen(user, MAX_LINE) - 1; // dont copy the \n at the end
 
         strncpy(target_user, user, target_user_len);
+        target_user[target_user_len] = '\0'; // in case the new target's name is shorter than previous
         printf("Now chatting with %s", user);
     }
 }
+/*
+    should communicate with server to send message to user
 
+    client should be logged in with /user
+    client should be chatting with someone using /msg <user>
+*/
 void send_message_handler(char buf[MAX_LINE], int len)
 {
-    /*
-     should communicate with server to send message to user
-
-     client should be logged in with /user
-     client should be chatting with someone using /msg <user>
-    */
-
     // build message data
     struct D58P_message_data data;
 
@@ -170,6 +187,7 @@ void* get_messages(void *aux)
 void exit_handler(char buf[MAX_LINE], int len)
 {
     RSA_free(keys);
+    RSA_free(target_key);
     exit(EXIT_SUCCESS);
 }
 
@@ -247,27 +265,14 @@ int main(int argc, char * argv[])
     bzero((char *) &auth, sizeof(auth));
     bzero(target_user, sizeof(target_user));
     // get encryption keys
-    if (get_keys(&keys)) {
+    if (get_keys(&keys) || keys == NULL) {
         fprintf(stderr, "client: could not generate encryption keys\n");
         exit(EXIT_FAILURE);
     }
-    /* Encryption test
-    fprintf(stderr, "client: got keys %d\n", RSA_size(keys));
-
-    char msg[] = "this is my message";
-    unsigned char ciphertext[KEY_LENGTH/8];
-    int cipher_len;
-    encrypt_message(keys, msg, ciphertext, strlen(msg), &cipher_len);
-    fprintf(stderr, "client: the original message = '%s'\nthe ciphertext = '%s'\n", msg, ciphertext);
-
-    unsigned char plaintext[KEY_LENGTH/8];
-    decrypt_message(keys, ciphertext, plaintext, cipher_len);
-    fprintf(stderr, "client: the decrypted message = '%s'\n", plaintext); */
-
 
     printf("Chat client started...\n");
     printf("Please authenticate using /user <user> <password>\n");
-    printf("Then begin chatting with a user using /msg <recipient> <message>\n");
+    printf("Then begin chatting with a user using /msg <recipient>\n");
     printf("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n");
 
     // create get messages thread

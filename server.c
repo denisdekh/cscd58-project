@@ -5,7 +5,7 @@ int sfd;                        // fd for socket
 struct sockaddr_in s_addr;      // address struct
 struct user *user_list;         // list of authenticated users. notes: temporary solution
 struct message *message_list;   // list of messages in flight
-struct server_thread *thread_list;  // list of threads currnetly handling /Get Message requests
+struct server_thread *thread_list;  // list of threads currently handling /Get Message requests
 
 pthread_mutex_t thread_list_mutex;      // synchronization construct
 pthread_mutex_t message_mutex;      // synchronization construct

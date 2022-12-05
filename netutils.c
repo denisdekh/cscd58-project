@@ -261,8 +261,7 @@ void create_get_message_response(struct D58P *res, enum D58P_ResponseCode code, 
 }
 
 /*
- Takes lines from buf into D58P struct
-*/
+ Takes lines from buf into D58P struct */
 void parse_D58P_buf(struct D58P *data, char buf[MAX_REQUEST])
 {
     bzero(data, sizeof(struct D58P));
