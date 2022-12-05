@@ -212,11 +212,21 @@ int main(int argc, char * argv[])
     bzero((char *) &auth, sizeof(auth));
     bzero(target_user, sizeof(target_user));
     // get encryption keys
-    /* if (get_keys(keys)) {
-        fprintf(stderr, "client: could not generate encryption keys");
+    if (get_keys(&keys)) {
+        fprintf(stderr, "client: could not generate encryption keys\n");
         exit(EXIT_FAILURE);
-    } */
-    
+    }
+    fprintf(stderr, "client: got keys %d\n", RSA_size(keys));
+
+    char msg[] = "this is my message";
+    unsigned char ciphertext[KEY_LENGTH/8];
+    int cipher_len;
+    encrypt_message(keys, msg, ciphertext, strlen(msg), &cipher_len);
+    fprintf(stderr, "client: the original message = '%s'\nthe ciphertext = '%s'", msg, ciphertext);
+
+    unsigned char plaintext[KEY_LENGTH/8];
+    decrypt_message(keys, ciphertext, plaintext, cipher_len);
+    fprintf(stderr, "client: the decrypted message = '%s'\n", plaintext);
 
     printf("Chat client started...\n");
     printf("Please authenticate using /user <user> <password>\n");
