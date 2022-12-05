@@ -1,10 +1,10 @@
 all: server client
 
 server:
-	gcc ./netutils.c ./server.c -g -o server
+	gcc ./common.c ./netutils.c ./server.c -g -o server
 
 client:
-	gcc ./netutils.c ./client.c -g -o client
+	gcc ./common.c ./netutils.c ./client.c -g -o client
 
 clean:
 	rm -f client

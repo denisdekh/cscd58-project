@@ -1,10 +1,11 @@
 #include "common.h"
+#include "arpa/inet.h"
 #include "time.h"
 
 #ifndef SERVER_H
 #define SERVER_H
 
-#define MAX_PENDING 5
+#define MAX_PENDING 10
 
 /*
  Represents a user
@@ -27,6 +28,23 @@ struct message {
     struct message *next;       // next message in message list
     struct message *prev;       // prev message in message list.
                                 // prev of head points to tail
+};
+
+/*
+ List element for a list of threads who are currently handling D58P /Get Message requests.
+
+ This is implemented so when a user changes their connection / loses connection
+ messages are routed properly.
+*/
+struct server_thread {
+    pthread_t tid;              // tid of this thread
+    time_t started;             // time this thread started
+    int client_socket;          // client socket for this connection
+    struct user *user;          // user struct this thread is getting messages for
+
+    int connection_switched;    // flag to determine if connection switched
+
+    struct server_thread *next; // next server_thread in list
 };
 
 #endif

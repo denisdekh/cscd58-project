@@ -159,7 +159,6 @@ void* get_messages(void *aux)
             }
         }
     }
-    
 }
 
 
