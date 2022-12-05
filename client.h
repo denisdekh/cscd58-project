@@ -20,7 +20,7 @@
 #define MESSAGE_COMMAND "/msg"
 
 enum InputType {
-    INPUT_REGULAR,
+    INPUT_SEND_MESSAGE,
     INPUT_USER,
     INPUT_EXIT,
     INPUT_MSG
