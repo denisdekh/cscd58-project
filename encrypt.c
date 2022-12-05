@@ -39,7 +39,7 @@ int set_public(RSA *rsa, char *e, char *n) {
     BIGNUM *nbn = BN_new();
     BN_hex2bn(&ebn, e);
     BN_hex2bn(&nbn, n);
-    RSA_set0_key(rsa, n, e, NULL);
+    RSA_set0_key(rsa, nbn, ebn, NULL);
     return 0;
 }
 
