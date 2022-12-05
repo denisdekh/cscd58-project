@@ -6,6 +6,7 @@ char target_user[MAX_LINE];
 struct D58P_auth auth;
 int authenticated;              // client side flag to determine if authenticated
 pthread_t get_msg_tid;
+RSA *keys;
 
 void user_handler(char buf[MAX_LINE], int len)
 {
@@ -169,6 +170,7 @@ void* get_messages(void *aux)
 */
 void exit_handler(char buf[MAX_LINE], int len)
 {
+    RSA_free(keys);
     exit(EXIT_SUCCESS);
 }
 
@@ -239,16 +241,34 @@ int main(int argc, char * argv[])
     // setup server struct
     bzero((char *)&server_addr, sizeof(server_addr)); // erase bytes in sin
     server_addr.sin_family = AF_INET; // internet family
-    bcopy(hp->h_addr, (char *)&server_addr.sin_addr, hp->h_length); // copy from hp to sin
+    bcopy(hp->h_addr_list[0], (char *)&server_addr.sin_addr, hp->h_length); // copy from hp to sin
     server_addr.sin_port = htons(SERVER_PORT); // set server port
 
     // zero global variables initially
     bzero((char *) &auth, sizeof(auth));
     bzero(target_user, sizeof(target_user));
+    // get encryption keys
+    if (get_keys(&keys)) {
+        fprintf(stderr, "client: could not generate encryption keys\n");
+        exit(EXIT_FAILURE);
+    }
+    /* Encryption test
+    fprintf(stderr, "client: got keys %d\n", RSA_size(keys));
+
+    char msg[] = "this is my message";
+    unsigned char ciphertext[KEY_LENGTH/8];
+    int cipher_len;
+    encrypt_message(keys, msg, ciphertext, strlen(msg), &cipher_len);
+    fprintf(stderr, "client: the original message = '%s'\nthe ciphertext = '%s'\n", msg, ciphertext);
+
+    unsigned char plaintext[KEY_LENGTH/8];
+    decrypt_message(keys, ciphertext, plaintext, cipher_len);
+    fprintf(stderr, "client: the decrypted message = '%s'\n", plaintext); */
+
 
     printf("Chat client started...\n");
     printf("Please authenticate using /user <user> <password>\n");
-    printf("Then begin chatting with a user using /msg <recipient>\n");
+    printf("Then begin chatting with a user using /msg <recipient> <message>\n");
     printf("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n");
 
     // create get messages thread
