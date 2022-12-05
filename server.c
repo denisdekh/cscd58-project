@@ -147,12 +147,14 @@ void insert_message(struct message *msg)
 /*
  Adds a new user to the linked list of users
 */
-void register_user(char *username, char *password)
+void register_user(char *username, char *password, char *e, char *n)
 {
     struct user *new_user = (struct user*)malloc(sizeof(struct user));
 
     strncpy(new_user->username, username, MAX_LINE);
     strncpy(new_user->password, password, MAX_LINE);
+    strncpy(new_user->e, e, MAX_LINE);
+    strncpy(new_user->n, n, MAX_LINE);
     
     new_user->next = user_list;
     user_list = new_user;
@@ -211,6 +213,9 @@ void user_handler(int client_socket, struct D58P *req, int len)
     char *username = req->lines[1];
     char *password = req->lines[2];
 
+    char *e = req->lines[3];
+    char *n = req->lines[4];
+
     // handle invalid username / password
     if(username == NULL || strnlen(username, MAX_LINE) == 0) { // invalid username
         create_response(&res, D58P_USER_STRING_RES, D58P_BAD_REQUEST);
@@ -228,7 +233,7 @@ void user_handler(int client_socket, struct D58P *req, int len)
     if(is_authenticated(username, password)) { // logged in
         create_response(&res, D58P_USER_STRING_RES, D58P_OK);
     } else if(find_user(username) == NULL) { // register new user
-        register_user(username, password);
+        register_user(username, password, e, n);
         create_response(&res, D58P_USER_STRING_RES, D58P_CREATED);
     } else {  // unauthenticated
         create_response(&res, D58P_USER_STRING_RES, D58P_UNAUTHORIZED);
