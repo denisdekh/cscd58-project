@@ -22,6 +22,19 @@ void log_ssl_err(const char *mes)
     }
 }
 
+// get the public key values to be sent to another user
+int get_public(RSA *rsa, BIGNUM **e, BIGNUM **n) {
+    BIGNUM **d;
+    RSA_get0_key(rsa, n, e, d);
+    return 0;
+}
+
+// set the public key from another user
+int set_public(RSA *rsa, BIGNUM *e, BIGNUM *n) {
+    RSA_set0_key(rsa, n, e, NULL);
+    return 0;
+}
+
 // takes an RSA struct pointer where the keys will be stored
 int get_keys(RSA **keypair) {
     fprintf(stderr, "Generating RSA (%d bits) keypair...", KEY_LENGTH);

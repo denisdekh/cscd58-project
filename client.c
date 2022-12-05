@@ -61,7 +61,7 @@ void user_handler(char buf[MAX_LINE], int len)
         printf("Authenticated as %s\n", auth.username);
     }
 }
-
+    
 void msg_handler(char buf[MAX_LINE], int len)
 {
     /*
