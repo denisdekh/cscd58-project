@@ -8,6 +8,33 @@ int authenticated;              // client side flag to determine if authenticate
 pthread_t get_msg_tid;
 RSA *keys, *target_key;
 
+
+/*
+ Routine for other thread.
+ Uses long polling type strategy to get messages from server
+*/
+void* get_messages(void *aux)
+{
+    while(1) {
+        if(authenticated) {
+            // build get message request
+            struct D58P req, res;
+            create_get_messages_request(&req, &auth);
+
+            int res_len = send_D58P_request(&server_addr, &req, &res);
+            int code = atoi(res.lines[1]);
+            char *from = res.lines[2];
+            char *message = res.lines[3];
+
+            // print the message
+            if(code == D58P_OK) {
+                printf("%s: %s\n", from, message);
+            }
+        }
+    }
+}
+
+
  /*
      Should communicate with server to somehow identify the client with the server
      Messages of form:
@@ -78,6 +105,14 @@ void user_handler(char buf[MAX_LINE], int len)
 
     if(code == D58P_OK || code == D58P_CREATED) {
         printf("Authenticated as %s\n", auth.username);
+
+        // cancel old thread if exists
+        if(get_msg_tid) {
+            pthread_cancel(get_msg_tid);
+        }
+
+        // create get messages thread
+        pthread_create(&get_msg_tid, NULL, &get_messages, NULL);
     }
 }
 
@@ -154,31 +189,6 @@ void send_message_handler(char buf[MAX_LINE], int len)
         printf("Could not send message to %s\n", target_user);
     }
 }
-
-/*
- Uses long polling type strategy to get messages from server
-*/
-void* get_messages(void *aux)
-{
-    while(1) {
-        if(authenticated) {
-            // build get message request
-            struct D58P req, res;
-            create_get_messages_request(&req, &auth);
-
-            int res_len = send_D58P_request(&server_addr, &req, &res);
-            int code = atoi(res.lines[1]);
-            char *from = res.lines[2];
-            char *message = res.lines[3];
-            
-            // print the message
-            if(code == D58P_OK) {
-                printf("%s: %s\n", from, message);
-            }
-        }
-    }
-}
-
 
 /*
  exit_handler
@@ -274,9 +284,6 @@ int main(int argc, char * argv[])
     printf("Please authenticate using /user <user> <password>\n");
     printf("Then begin chatting with a user using /msg <recipient>\n");
     printf("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n");
-
-    // create get messages thread
-    pthread_create(&get_msg_tid, NULL, &get_messages, NULL);
 
     // main client loop
     while (1) client_loop();
