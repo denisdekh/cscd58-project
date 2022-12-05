@@ -40,6 +40,9 @@ struct D58P_auth {
     
     char password[MAX_REQUEST];         // type of request
     int password_len;                   // length of message
+
+    char e[MAX_REQUEST];                // values for the public key
+    char n[MAX_REQUEST];
 };
 
 struct D58P_message_data {
