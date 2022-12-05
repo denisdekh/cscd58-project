@@ -1,4 +1,3 @@
-#include <openssl/opensslconf.h>
 #include <openssl/rsa.h>
 #include <openssl/pem.h>
 #include <openssl/err.h>

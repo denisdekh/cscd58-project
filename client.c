@@ -212,10 +212,11 @@ int main(int argc, char * argv[])
     bzero((char *) &auth, sizeof(auth));
     bzero(target_user, sizeof(target_user));
     // get encryption keys
-    if (get_keys(keys)) {
+    /* if (get_keys(keys)) {
         fprintf(stderr, "client: could not generate encryption keys");
         exit(EXIT_FAILURE);
-    }
+    } */
+    
 
     printf("Chat client started...\n");
     printf("Please authenticate using /user <user> <password>\n");
