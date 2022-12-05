@@ -1,10 +1,10 @@
 all: server client
 
-server:
+server: server.c netutils.c 
 	gcc ./common.c ./netutils.c ./server.c -g -o server
 
-client:
-	gcc ./common.c ./netutils.c ./client.c -g -o client
+client: client.c encrypt.c netutils.c 
+	gcc  ./common.c ./netutils.c ./encrypt.c ./client.c -g -o client -lssl -lcrypto
 
 clean:
 	rm -f client

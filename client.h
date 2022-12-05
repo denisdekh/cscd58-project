@@ -1,4 +1,5 @@
 #include "common.h"
+#include "encrypt.h"
 #include <netdb.h>
 
 #ifndef CLIENT_H
