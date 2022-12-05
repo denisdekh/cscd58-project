@@ -24,6 +24,8 @@
 #define D58P_USER_STRING_RES "D58P \\User"
 #define D58P_ERROR_STRING "D58P \\Error"
 
+#define D58P_ACK_STRING "D58P /Acknowledge"
+
 enum D58P_ResponseCode {
     D58P_OK=200,
     D58P_CREATED=201,
@@ -71,9 +73,11 @@ void create_get_message_response(struct D58P *res, enum D58P_ResponseCode code, 
 /* Sending / Receiving D58P data */
 int send_D58P_request(struct sockaddr_in *sin, struct D58P *req, struct D58P *res);
 void send_D58P_response(int sfd, struct D58P *res);
+void send_D58P_response_ack(int sfd);
 
 /* Other utils */
 void parse_D58P_buf(struct D58P *data, char buf[MAX_REQUEST]);
 void dump_D58P(struct D58P *data);
+int verify_acknowledgement(int sfd);
 
 #endif

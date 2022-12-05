@@ -4,8 +4,84 @@
 int sfd;                        // fd for socket
 struct sockaddr_in s_addr;      // address struct
 struct user *user_list;         // list of authenticated users. notes: temporary solution
-struct message *message_list;  // list of messages in flight
-// maybe a semaphore for user_list + message_list syncrhonizaiton?
+struct message *message_list;   // list of messages in flight
+struct server_thread *thread_list;  // list of threads currnetly handling /Get Message requests
+
+pthread_mutex_t thread_list_mutex;      // synchronization construct
+pthread_mutex_t message_mutex;      // synchronization construct
+
+/*
+ Helper to add current thread to list of current threads handling 
+ /Get Message requests.
+*/
+struct server_thread* add_thread(int client_socket, struct user *user)
+{
+    struct server_thread *t = (struct server_thread*) malloc(sizeof(struct server_thread));
+    
+    t->client_socket = client_socket;
+    t->started = time(NULL);
+    t->tid = pthread_self();
+    t->user = user;
+    t->connection_switched = 0;
+
+    t->next = thread_list;
+    pthread_mutex_lock(&thread_list_mutex);
+    thread_list = t;
+    pthread_mutex_unlock(&thread_list_mutex);
+
+    return t;
+}
+
+/*
+ Helper to remove particular thread from list of threads handling D58P /Get Message requests
+
+ note: returned thread should be freed
+*/
+void remove_thread(struct server_thread *t)
+{
+    pthread_mutex_lock(&thread_list_mutex);
+
+    struct server_thread *cur = thread_list, *p = NULL;
+
+    while(cur != NULL) {
+        if(cur == t) {
+            if(p == NULL) {
+                thread_list = thread_list->next;
+            } else {
+                p->next = cur->next;
+            }
+            break;
+        }
+        p = cur;
+        cur = cur->next;
+    }
+
+    pthread_mutex_unlock(&thread_list_mutex);
+}
+
+/*
+ Helper to find a thread currently handling D58P /Get Message requests for this
+ particular user.
+*/
+struct server_thread *find_thread(struct user *user)
+{
+    pthread_mutex_lock(&thread_list_mutex);
+
+    struct server_thread *t = thread_list, *ret = NULL;
+
+    while(t != NULL) {
+        if(t->user == user) {
+            ret = t;
+            break;
+        }
+
+        t = t->next;
+    }
+
+    pthread_mutex_unlock(&thread_list_mutex);
+
+    return ret;
+}
 
 /*
  Helper to add message to the in-memory list of in-flight messages
@@ -20,6 +96,9 @@ void add_message(struct user *from, struct user *to, char *message)
     strncpy(new_message->buf, message, MAX_LINE);
     new_message->from = from;
     new_message->to = to;
+    new_message->time = time(NULL);
+
+    pthread_mutex_lock(&message_mutex);
 
     if(message_list == NULL) {
         new_message->prev = new_message;
@@ -31,15 +110,38 @@ void add_message(struct user *from, struct user *to, char *message)
         message_list->prev->next = new_message;
         message_list->prev = new_message;
     }
+
+    pthread_mutex_unlock(&message_mutex);
 }
 
 /*
- Helper function to determine if string is empty or not.
- Reads only MAX_LINE characters
+ Helper to insert message into message_list into proper position according
+ to time the message was first received by the server
 */
-int is_empty(char *str)
+void insert_message(struct message *msg)
 {
-    return str == NULL || strnlen(str, MAX_LINE) == 0;
+    pthread_mutex_lock(&message_mutex);
+
+    struct message *cur = message_list, *prev = NULL;
+
+    if(message_list == NULL) message_list = msg; // insert at head
+    else if (msg->time < message_list->time) { // insert at head
+        msg->next = message_list;
+        message_list = msg;
+    } else { // insert elsewhere
+        while(cur != NULL) {
+            if(msg->time < cur->time) {
+                prev->next = msg;
+                msg->next = cur;
+                break;
+            }
+
+            prev = cur;
+            cur = cur->next;
+        }
+    }
+
+    pthread_mutex_unlock(&message_mutex);
 }
 
 /*
@@ -143,7 +245,6 @@ void user_handler(int client_socket, struct D58P *req, int len)
  Handles D58P /Message requests
 
  D58P Message request form:
-
     D58P /Message
     <user>
     <password>
@@ -162,14 +263,14 @@ void message_handler(int client_socket, struct D58P *req, int len)
 
     // bad request if any fields empty
     if(is_empty(username) || is_empty(password) || is_empty(recipient) || is_empty(message)) {
-        create_response(&res, D58P_GET_MESSAGE_STRING_RES, D58P_BAD_REQUEST);
+        create_response(&res, D58P_MESSAGE_STRING_RES, D58P_BAD_REQUEST);
         send_D58P_response(client_socket, &res);
         return;
     }
 
     // assure user is authenticated
     if(!is_authenticated(username, password)) {
-        create_response(&res, D58P_GET_MESSAGE_STRING_RES, D58P_UNAUTHORIZED);
+        create_response(&res, D58P_MESSAGE_STRING_RES, D58P_UNAUTHORIZED);
         send_D58P_response(client_socket, &res);
         return;
     }
@@ -179,7 +280,7 @@ void message_handler(int client_socket, struct D58P *req, int len)
     struct user *to = find_user(recipient);
 
     if(from == NULL || to == NULL) {
-        create_response(&res, D58P_GET_MESSAGE_STRING_RES, D58P_NOT_FOUND);
+        create_response(&res, D58P_MESSAGE_STRING_RES, D58P_NOT_FOUND);
         send_D58P_response(client_socket, &res);
         return;
     }
@@ -188,7 +289,7 @@ void message_handler(int client_socket, struct D58P *req, int len)
     add_message(from, to, message);
 
     // reply with 200 OK
-    create_response(&res, D58P_GET_MESSAGE_STRING_RES, D58P_OK);
+    create_response(&res, D58P_MESSAGE_STRING_RES, D58P_OK);
     send_D58P_response(client_socket, &res);
 }
 
@@ -226,19 +327,40 @@ void get_message_handler(int client_socket, struct D58P *req, int len)
         return;
     }
 
+    struct user *user = find_user(username);
+    
+    // determine if thread already exists for this user
+    struct server_thread *t = find_thread(user);
+    if(t != NULL) {
+        t->connection_switched = 1;
+    }
+    
+    // add this thread to list
+    t = add_thread(client_socket, user);
+
     // find oldest message that should be sent
     struct message *cur_message, *prev_message, *oldest_message;
     
     prev_message = NULL;
-    cur_message = message_list; // search from tail of list
+    cur_message = message_list;
     oldest_message = NULL;
 
-    struct user *user = find_user(username);
-
     while(oldest_message == NULL) { // while we havent found a message
+        if(t->connection_switched) { // exit this thread. another thread will handle for this user
+            printf("%s connection switched\n", username);
+            remove_thread(t);
+            free(t);
+            close(client_socket);
+            pthread_exit(0);
+        }
+        
+        pthread_mutex_lock(&message_mutex);
+        
         while(cur_message != NULL) {
             if(cur_message->to == user) {
                 oldest_message = cur_message;
+                remove_thread(t);
+                free(t);
                 break;
             }
 
@@ -246,28 +368,41 @@ void get_message_handler(int client_socket, struct D58P *req, int len)
             cur_message = cur_message->next;
         }
         
+        // found message
+        if(oldest_message != NULL) break;
+        
         // reset values to search again
         cur_message = message_list;
         prev_message = NULL;
+        pthread_mutex_unlock(&message_mutex);
     }
 
     // remove message from message list
-    if(message_list->next == NULL && oldest_message == message_list) {
+    if(oldest_message == message_list && message_list->next == NULL) {
         message_list = NULL;
+    } else if(oldest_message == message_list) {
+        oldest_message->next->prev = oldest_message->prev;
+        message_list = oldest_message->next;
     } else if(oldest_message == message_list->prev) {
-        oldest_message->prev->next = oldest_message->next;
+        oldest_message->prev->next = NULL;
         message_list->prev = oldest_message->prev;
     } else {
         oldest_message->prev->next = oldest_message->next;
+        oldest_message->next->prev = oldest_message->prev;
     }
+    pthread_mutex_unlock(&message_mutex);
 
     // reply with message
     create_get_message_response(&res, D58P_OK, oldest_message->from->username, oldest_message->buf);
-
     send_D58P_response(client_socket, &res);
 
-    // free oldest message
-    free(oldest_message);
+    // verify acknowledgement
+    if(verify_acknowledgement(client_socket)) {
+        free(oldest_message); // we can delete the message for good
+    } else {
+        // re-add the message back to message list
+        insert_message(oldest_message);
+    }
 }
 
 /*
@@ -286,8 +421,6 @@ void *handle_connection(void *arg)
     // parse data as D58P request
     struct D58P req;
     parse_D58P_buf(&req, buf);
-    
-    printf("~ Received request ~\n");
     dump_D58P(&req);
 
     // Go to request handler
@@ -314,8 +447,10 @@ void *handle_connection(void *arg)
 void server_loop()
 {
     int client_socket; pthread_t tid;
-    
+
     client_socket = accept_connection(sfd, &s_addr);
+
+    printf("~ New connection: %s\n", inet_ntoa(s_addr.sin_addr));
 
     pthread_create(&tid, NULL, &handle_connection, &client_socket);
 }
@@ -343,6 +478,9 @@ int main()
         perror("server: could not bind");
         exit(1);
     }
+
+    pthread_mutex_init(&message_mutex, NULL);
+    pthread_mutex_init(&thread_list_mutex, NULL);
 
     // listen for connections
     listen(sfd, MAX_PENDING);

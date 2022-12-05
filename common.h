@@ -6,4 +6,6 @@
 
 #define SERVER_PORT 6777
 
+int is_empty(char *str);
+
 #endif

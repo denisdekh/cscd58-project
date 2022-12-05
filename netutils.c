@@ -90,6 +90,10 @@ int send_D58P_request(struct sockaddr_in *sin, struct D58P *req, struct D58P *re
     char res_buf[MAX_REQUEST];
     bzero(res_buf, MAX_REQUEST);
     int res_len = recv(sfd, res_buf, MAX_REQUEST, 0);
+
+    // acknowledge to server that we received a response
+    send_D58P_response_ack(sfd);
+
     close(sfd);
 
     parse_D58P_buf(res, res_buf);
@@ -127,6 +131,35 @@ void send_D58P_response(int sfd, struct D58P *res)
     send(sfd, buf, len, 0);
 }
 
+/*
+ Helper to send a D58P response acknowledgement
+*/
+void send_D58P_response_ack(int sfd)
+{
+    // send request
+    send(sfd, D58P_ACK_STRING, sizeof(D58P_ACK_STRING), 0);
+}
+
+/*
+ Verifies an acknowledgement on the socket file descriptor
+
+ returns 1 if acknowledgement received, 0 otherwise
+*/
+int verify_acknowledgement(int sfd)
+{
+    // acknowledgement
+    char ack_buf[MAX_REQUEST];
+    bzero(ack_buf, MAX_REQUEST);
+
+    // recieve data  through socket
+    recv(sfd, ack_buf, sizeof(ack_buf), 0); 
+    
+    // parse data as D58P request
+    struct D58P ack;
+    parse_D58P_buf(&ack, ack_buf);
+
+    return strncmp(ack.lines[0], D58P_ACK_STRING, MAX_REQUEST) == 0;
+}
 
 /*
  create_message_request
