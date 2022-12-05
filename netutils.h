@@ -18,6 +18,8 @@
 */
 #define D58P_MESSAGE_STRING_REQ "D58P /Message"
 #define D58P_MESSAGE_STRING_RES "D58P \\Message"
+#define D58P_GET_MESSAGE_STRING_REQ "D58P /Get Message"
+#define D58P_GET_MESSAGE_STRING_RES "D58P \\Get Message"
 #define D58P_USER_STRING_REQ "D58P /User"
 #define D58P_USER_STRING_RES "D58P \\User"
 #define D58P_ERROR_STRING "D58P \\Error"
@@ -26,7 +28,8 @@ enum D58P_ResponseCode {
     D58P_OK=200,
     D58P_CREATED=201,
     D58P_BAD_REQUEST=400,
-    D58P_UNAUTHORIZED=401
+    D58P_UNAUTHORIZED=401,
+    D58P_NOT_FOUND=404
 };
 
 struct D58P_auth {
@@ -56,10 +59,14 @@ struct D58P {
 int create_connection(struct sockaddr_in *sin);
 int accept_connection(int sfd, struct sockaddr_in *sin);
 
-/* Helpers to create D58P data */
+/* Helpers to create D58P request data */
 void create_message_request(struct D58P *req, struct D58P_auth *auth, struct D58P_message_data *data);
 void create_user_request(struct D58P *req, struct D58P_auth *auth);
+void create_get_messages_request(struct D58P *req, struct D58P_auth *auth);
+
+/* Helpers to create D58P response data */
 void create_response(struct D58P *res, char *type, enum D58P_ResponseCode code);
+void create_get_message_response(struct D58P *res, enum D58P_ResponseCode code, char *from, char buf[MAX_LINE]);
 
 /* Sending / Receiving D58P data */
 int send_D58P_request(struct sockaddr_in *sin, struct D58P *req, struct D58P *res);

@@ -58,9 +58,7 @@ int accept_connection(int sfd, struct sockaddr_in *sin)
 */
 int send_D58P_request(struct sockaddr_in *sin, struct D58P *req, struct D58P *res)
 {
-    // create connection to server
-    int sfd = create_connection(sin);
-    
+    // convert struct D58P into char buffer
     char buf[MAX_REQUEST];
     bzero(buf, MAX_REQUEST);
     int len = 0;
@@ -81,6 +79,9 @@ int send_D58P_request(struct sockaddr_in *sin, struct D58P *req, struct D58P *re
     }
 
     len -= 1; // dont send the very last \n character
+
+    // create connection to server
+    int sfd = create_connection(sin);
 
     // send request
     send(sfd, buf, len, 0);
@@ -173,6 +174,25 @@ void create_user_request(struct D58P *req, struct D58P_auth *auth)
     strncat(req->lines[2], auth->password, auth->password_len);
 }
 
+/*
+ create_get_messages_request
+
+ Builds a D58P /Get Message request from provided auth information
+*/
+void create_get_messages_request(struct D58P *req, struct D58P_auth *auth)
+{
+    // zero the struct
+    bzero(req, sizeof(struct D58P));
+
+    // set request type
+    strncpy(req->lines[0], D58P_GET_MESSAGE_STRING_REQ, sizeof(D58P_GET_MESSAGE_STRING_REQ));
+
+    // set username
+    strncpy(req->lines[1], auth->username, auth->user_len);
+
+    // set password
+    strncat(req->lines[2], auth->password, auth->password_len);
+}
 
 /*
  Creates generic D58P response of specified type with specified response code
@@ -191,6 +211,20 @@ void create_response(struct D58P *res, char *type, enum D58P_ResponseCode code)
     sprintf(res_code, "%d", code);
     int code_len = strnlen(res_code, MAX_LINE);
     strncpy(res->lines[1], res_code, code_len);
+}
+
+/*
+ Creates get message response given resposne code and the message to be returned
+*/
+void create_get_message_response(struct D58P *res, enum D58P_ResponseCode code, char *from, char buf[MAX_LINE])
+{
+    create_response(res, D58P_GET_MESSAGE_STRING_RES, code);
+
+    // set sender of message
+    strncpy(res->lines[2], from, MAX_LINE);
+
+    // set message
+    strncpy(res->lines[3], buf, MAX_LINE);
 }
 
 /*

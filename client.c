@@ -4,6 +4,8 @@
 struct sockaddr_in server_addr;     // server address struct
 char target_user[MAX_LINE];
 struct D58P_auth auth;
+int authenticated;              // client side flag to determine if authenticated
+pthread_t get_msg_tid;
 RSA *keys;
 
 void user_handler(char buf[MAX_LINE], int len)
@@ -51,15 +53,20 @@ void user_handler(char buf[MAX_LINE], int len)
     create_user_request(&req, &auth);
 
     int res_len = send_D58P_request(&server_addr, &req, &res);
-    printf("received response: \n");
-    dump_D58P(&res);
+
+    int code = atoi(res.lines[1]);
+    authenticated = code == D58P_OK || code == D58P_CREATED;
+
+    if(code == D58P_OK || code == D58P_CREATED) {
+        printf("Authenticated as %s\n", auth.username);
+    }
 }
 
 void msg_handler(char buf[MAX_LINE], int len)
 {
     /*
-     Sets a global variable target_user[MAX_LINE] within client so that future messages to regular_handler will send messages
-     to the specified user.
+     Sets a global variable target_user[MAX_LINE] within client so that future messages to send_message_handler
+     will send messages to the specified user.
 
      Messages of form:
         /msg <recipient>
@@ -85,7 +92,7 @@ void msg_handler(char buf[MAX_LINE], int len)
     }
 }
 
-void regular_handler(char buf[MAX_LINE], int len)
+void send_message_handler(char buf[MAX_LINE], int len)
 {
     /*
      should communicate with server to send message to user
@@ -123,10 +130,39 @@ void regular_handler(char buf[MAX_LINE], int len)
     create_message_request(&req, &auth, &data);
 
     int res_len = send_D58P_request(&server_addr, &req, &res);
-    
-    // TODO: do something on response
-    printf("sent message \n");
+
+    int code = atoi(res.lines[1]);
+
+    if(code != D58P_OK) {
+        printf("Could not send message to %s\n", target_user);
+    }
 }
+
+/*
+ Uses long polling type strategy to get messages from server
+*/
+void* get_messages(void *aux)
+{
+    while(1) {
+        if(authenticated) {
+            // build get message request
+            struct D58P req, res;
+            create_get_messages_request(&req, &auth);
+
+            int res_len = send_D58P_request(&server_addr, &req, &res);
+            int code = atoi(res.lines[1]);
+            char *from = res.lines[2];
+            char *message = res.lines[3];
+            
+            // print the message
+            if(code == D58P_OK) {
+                printf("%s: %s\n", from, message);
+            }
+        }
+    }
+    
+}
+
 
 /*
  exit_handler
@@ -152,7 +188,7 @@ int parse_input(char buf[MAX_LINE])
         return INPUT_MSG;
     }
 
-    return INPUT_REGULAR;
+    return INPUT_SEND_MESSAGE;
 }
 
 /*
@@ -179,7 +215,7 @@ void client_loop()
         case INPUT_MSG:
             return msg_handler(buf, len);
         default:
-            return regular_handler(buf, len);
+            return send_message_handler(buf, len);
     }
 }
 
@@ -234,6 +270,9 @@ int main(int argc, char * argv[])
     printf("Please authenticate using /user <user> <password>\n");
     printf("Then begin chatting with a user using /msg <recipient> <message>\n");
     printf("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n");
+
+    // create get messages thread
+    pthread_create(&get_msg_tid, NULL, &get_messages, NULL);
 
     // main client loop
     while (1) client_loop();

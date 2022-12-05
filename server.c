@@ -4,7 +4,43 @@
 int sfd;                        // fd for socket
 struct sockaddr_in s_addr;      // address struct
 struct user *user_list;         // list of authenticated users. notes: temporary solution
+struct message *message_list;  // list of messages in flight
+// maybe a semaphore for user_list + message_list syncrhonizaiton?
 
+/*
+ Helper to add message to the in-memory list of in-flight messages
+
+ New messages added to tail of list.
+ Messages closer to front are older messages.
+*/
+void add_message(struct user *from, struct user *to, char *message)
+{
+    struct message *new_message = (struct message*) malloc(sizeof(struct message));
+
+    strncpy(new_message->buf, message, MAX_LINE);
+    new_message->from = from;
+    new_message->to = to;
+
+    if(message_list == NULL) {
+        new_message->prev = new_message;
+        new_message->next = NULL;
+        message_list = new_message;
+    } else {
+        new_message->next = NULL;
+        new_message->prev = message_list->prev;
+        message_list->prev->next = new_message;
+        message_list->prev = new_message;
+    }
+}
+
+/*
+ Helper function to determine if string is empty or not.
+ Reads only MAX_LINE characters
+*/
+int is_empty(char *str)
+{
+    return str == NULL || strnlen(str, MAX_LINE) == 0;
+}
 
 /*
  Adds a new user to the linked list of users
@@ -31,6 +67,7 @@ struct user* find_user(char *username)
         if(strncmp(username, cur_user->username, MAX_LINE) == 0) {
             return cur_user;
         }
+        cur_user = cur_user->next;
     }
 
     return NULL;
@@ -99,9 +136,9 @@ void user_handler(int client_socket, struct D58P *req, int len)
 }
 
 /*
- regular_handler
+ message_handler
 
- Handles logic to be performed on a regular message request from a user to another user
+ Handles logic to be performed on a message request from a user to another user
 
  Handles D58P /Message requests
 
@@ -113,17 +150,133 @@ void user_handler(int client_socket, struct D58P *req, int len)
     <target user>
     <message>
 */
-void regular_handler(int client_socket, struct D58P *req, int len)
+void message_handler(int client_socket, struct D58P *req, int len)
 {
-    printf("server: regular message handler\n");
-    // TODO: send a message somehow
+    struct D58P res;
+
+    // get data from request
+    char *username = req->lines[1];
+    char *password = req->lines[2];
+    char *recipient = req->lines[3];
+    char *message = req->lines[4];
+
+    // bad request if any fields empty
+    if(is_empty(username) || is_empty(password) || is_empty(recipient) || is_empty(message)) {
+        create_response(&res, D58P_GET_MESSAGE_STRING_RES, D58P_BAD_REQUEST);
+        send_D58P_response(client_socket, &res);
+        return;
+    }
+
+    // assure user is authenticated
+    if(!is_authenticated(username, password)) {
+        create_response(&res, D58P_GET_MESSAGE_STRING_RES, D58P_UNAUTHORIZED);
+        send_D58P_response(client_socket, &res);
+        return;
+    }
+
+    // make sure from and to exist
+    struct user *from = find_user(username);
+    struct user *to = find_user(recipient);
+
+    if(from == NULL || to == NULL) {
+        create_response(&res, D58P_GET_MESSAGE_STRING_RES, D58P_NOT_FOUND);
+        send_D58P_response(client_socket, &res);
+        return;
+    }
+
+    // add message to in-memory list of in flight messages
+    add_message(from, to, message);
+
+    // reply with 200 OK
+    create_response(&res, D58P_GET_MESSAGE_STRING_RES, D58P_OK);
+    send_D58P_response(client_socket, &res);
+}
+
+/*
+ get_message_handler
+
+ Handles logic to be performed on a get message request
+
+ Handles D58P /Get Message requests
+
+ D58P Message request form:
+    D58P /Message
+    <user>
+    <password>
+*/
+void get_message_handler(int client_socket, struct D58P *req, int len)
+{
+    struct D58P res;
+    bzero(&res, sizeof(struct D58P));
+
+    char *username = req->lines[1];
+    char *password = req->lines[2];
+
+    // bad request if any fields empty
+    if(is_empty(username) || is_empty(password)) {
+        create_response(&res, D58P_GET_MESSAGE_STRING_RES, D58P_BAD_REQUEST);
+        send_D58P_response(client_socket, &res);
+        return;
+    }
+
+    // assure user is authenticated
+    if(!is_authenticated(username, password)) {
+        create_response(&res, D58P_GET_MESSAGE_STRING_RES, D58P_UNAUTHORIZED);
+        send_D58P_response(client_socket, &res);
+        return;
+    }
+
+    // find oldest message that should be sent
+    struct message *cur_message, *prev_message, *oldest_message;
+    
+    prev_message = NULL;
+    cur_message = message_list; // search from tail of list
+    oldest_message = NULL;
+
+    struct user *user = find_user(username);
+
+    while(oldest_message == NULL) { // while we havent found a message
+        while(cur_message != NULL) {
+            if(cur_message->to == user) {
+                oldest_message = cur_message;
+                break;
+            }
+
+            prev_message = cur_message;
+            cur_message = cur_message->next;
+        }
+        
+        // reset values to search again
+        cur_message = message_list;
+        prev_message = NULL;
+    }
+
+    // remove message from message list
+    if(message_list->next == NULL && oldest_message == message_list) {
+        message_list = NULL;
+    } else if(oldest_message == message_list->prev) {
+        oldest_message->prev->next = oldest_message->next;
+        message_list->prev = oldest_message->prev;
+    } else {
+        oldest_message->prev->next = oldest_message->next;
+    }
+
+    // reply with message
+    create_get_message_response(&res, D58P_OK, oldest_message->from->username, oldest_message->buf);
+
+    send_D58P_response(client_socket, &res);
+
+    // free oldest message
+    free(oldest_message);
 }
 
 /*
  Handles a connection from a client
 */
-void handle_connection(int client_socket)
+void *handle_connection(void *arg)
 {
+    int client_socket = *((int*) arg);
+
     char buf[MAX_REQUEST];
     bzero(buf, MAX_REQUEST);
 
@@ -139,13 +292,18 @@ void handle_connection(int client_socket)
 
     // Go to request handler
     if(strncmp(req.lines[0], D58P_MESSAGE_STRING_REQ, MAX_REQUEST) == 0) {
-        regular_handler(client_socket, &req, len);
+        message_handler(client_socket, &req, len);
     } else if (strncmp(req.lines[0], D58P_USER_STRING_REQ, MAX_REQUEST) == 0) {
         user_handler(client_socket, &req, len);
+    } else if (strncmp(req.lines[0], D58P_GET_MESSAGE_STRING_REQ, MAX_REQUEST) == 0) {
+        get_message_handler(client_socket, &req, len);
     } else {
+        printf("Invalid request\n");
         char reply_buf[MAX_REQUEST] = "Invalid request\n";
         send(client_socket, reply_buf, MAX_REQUEST, 0); // send back to client
     }
+
+    close(client_socket);
 }
 
 /*
@@ -155,9 +313,11 @@ void handle_connection(int client_socket)
 */
 void server_loop()
 {
-    int client_socket = accept_connection(sfd, &s_addr);
-    handle_connection(client_socket);
-    close(client_socket);
+    int client_socket; pthread_t tid;
+    
+    client_socket = accept_connection(sfd, &s_addr);
+
+    pthread_create(&tid, NULL, &handle_connection, &client_socket);
 }
 
 int main()
