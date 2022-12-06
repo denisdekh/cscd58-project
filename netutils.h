@@ -75,6 +75,10 @@ void create_get_messages_request(struct D58P *req, struct D58P_auth *auth);
 void create_response(struct D58P *res, char *type, enum D58P_ResponseCode code);
 void create_get_message_response(struct D58P *res, enum D58P_ResponseCode code, char *from, char buf[MAX_LINE]);
 
+/* for requesting public keys of other users */
+void create_get_key_response(struct D58P *res, enum D58P_ResponseCode code, char *user, char* target_user, char *e, char *n);
+void create_get_key_request(struct D58P *req, struct D58P_auth *auth, char *target_user);
+
 /* Sending / Receiving D58P data */
 int send_D58P_request(struct sockaddr_in *sin, struct D58P *req, struct D58P *res);
 void send_D58P_response(int sfd, struct D58P *res);
