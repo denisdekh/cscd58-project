@@ -73,22 +73,6 @@ void user_handler(char buf[MAX_LINE], int len)
         fprintf(stderr, "client: could not retrieve the public key\n");
         exit(EXIT_FAILURE);
     }
-    /* encryption test
-    RSA *new;
-    get_keys(&new);
-
-    set_public(new, auth.e, auth.n);
-    
-    unsigned char msg[] = "hmm very long msh jdnajdijsahdjashdijsahdisajdasdsadsadsadsadsasadasdssadsadasdasas";
-    unsigned char ciphertext[RSA_size(new)];
-    int cipher_len;
-    encrypt_message(new, msg, ciphertext, strlen(msg), &cipher_len);
-    fprintf(stderr, "client: the original message = '%s' length = %ld\n", msg, strlen(msg));
-
-    unsigned char plaintext[RSA_size(keys)];
-    int plain_len = decrypt_message(keys, ciphertext, plaintext, cipher_len);
-    plaintext[plain_len] = '\0';
-    fprintf(stderr, "client: the decrypted message = '%s' length = %ld\n", plaintext, strlen(plaintext)); */
 
     // dont set \n in username and password
     auth.user_len += 1;
@@ -114,6 +98,50 @@ void user_handler(char buf[MAX_LINE], int len)
 
         // create get messages thread
         pthread_create(&get_msg_tid, NULL, &get_messages, NULL);
+    }
+}
+
+
+void create_get_key_request(struct D58P *req, struct D58P_auth *auth)
+{
+    // zero the struct
+    bzero(req, sizeof(struct D58P));
+
+    // set request type
+    strncpy(req->lines[0], D58P_GET_KEY_REQ, sizeof(D58P_GET_KEY_REQ));
+
+    // set username
+    strncpy(req->lines[1], auth->username, auth->user_len);
+
+    // set target user
+    strncpy(req->lines[2], target_user, strlen(target_user));
+}
+
+/*  Send request to the server of the form
+    D58P /Get Key
+    <user>
+    <target_user>
+    
+    Then saves the key and the name of the target_user to keep track of the current key*/
+int key_handler() {
+    if(authenticated) {
+        // build get message request
+        struct D58P req, res;
+        create_get_key_request(&req, &auth);
+
+        int res_len = send_D58P_request(&server_addr, &req, &res);
+        int code = atoi(res.lines[1]);
+        
+        if(code == D58P_OK) {
+            char *key_for = res.lines[3];
+            char *e = res.lines[4];
+            char *n = res.lines[5];
+            if (set_public(target_key, e, n)) {  return 1; }
+            strncpy(target_key_name, key_for, MAX_LINE);
+            return 0;
+        } else {
+            return 1;
+        }
     }
 }
 
@@ -155,48 +183,8 @@ void msg_handler(char buf[MAX_LINE], int len)
     }
 }
 
-/*  Send request to the server of the form
-    D58P /Get Key
-    <user>
-    <target_user>
-    
-    Then saves the key and the name of the target_user to keep track of the current key*/
-int key_handler() {
-    if(authenticated) {
-        // build get message request
-        struct D58P req, res;
-        create_get_key_request(&req, &auth);
 
-        int res_len = send_D58P_request(&server_addr, &req, &res);
-        int code = atoi(res.lines[1]);
-        
-        if(code == D58P_OK) {
-            char *key_for = res.lines[3];
-            char *e = res.lines[4];
-            char *n = res.lines[5];
-            if (set_public(target_key, e, n)) {  return 1; }
-            strncpy(target_key_name, key_for, MAX_LINE);
-            return 0;
-        } else {
-            return 1;
-        }
-    }
-}
 
-void create_get_key_request(struct D58P *req, struct D58P_auth *auth)
-{
-    // zero the struct
-    bzero(req, sizeof(struct D58P));
-
-    // set request type
-    strncpy(req->lines[0], D58P_GET_KEY_REQ, sizeof(D58P_GET_KEY_REQ));
-
-    // set username
-    strncpy(req->lines[1], auth->username, auth->user_len);
-
-    // set target user
-    strncpy(req->lines[2], target_user, strlen(target_user));
-}
 /*
     should communicate with server to send message to user
 
@@ -340,3 +328,21 @@ int main(int argc, char * argv[])
     // main client loop
     while (1) client_loop();
 }
+
+
+    /* encryption test
+    RSA *new;
+    get_keys(&new);
+
+    set_public(new, auth.e, auth.n);
+    
+    unsigned char msg[] = "hmm very long msh jdnajdijsahdjashdijsahdisajdasdsadsadsadsadsasadasdssadsadasdasas";
+    unsigned char ciphertext[RSA_size(new)];
+    int cipher_len;
+    encrypt_message(new, msg, ciphertext, strlen(msg), &cipher_len);
+    fprintf(stderr, "client: the original message = '%s' length = %ld\n", msg, strlen(msg));
+
+    unsigned char plaintext[RSA_size(keys)];
+    int plain_len = decrypt_message(keys, ciphertext, plaintext, cipher_len);
+    plaintext[plain_len] = '\0';
+    fprintf(stderr, "client: the decrypted message = '%s' length = %ld\n", plaintext, strlen(plaintext)); */

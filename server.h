@@ -18,9 +18,6 @@ struct user {
     char n[MAX_LINE];           // public key
 
     struct user *next;          // next user in user list
-
-    char e[KEY_LENGTH];         // public key values
-    char n[KEY_LENGTH];
 };
 
 struct message {
