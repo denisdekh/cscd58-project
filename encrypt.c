@@ -1,4 +1,5 @@
 #include "encrypt.h"
+#include "stdio.h"
 #ifndef NET_UTILS_H
     #include "netutils.h"
 #endif 
@@ -29,7 +30,16 @@ void log_ssl_err(const char *mes)
 int get_public(RSA *rsa, char *e, char *n) {
     strncpy(e, BN_bn2hex(RSA_get0_e(rsa)), MAX_LINE);
     strncpy(n, BN_bn2hex(RSA_get0_n(rsa)), MAX_LINE);
+
     //printf("Copied keys: e = %s and n = %s\n", e, n);
+    return 0;
+}
+
+int get_private(RSA *rsa, char *e, char *n, char *d) {
+    strncpy(e, BN_bn2hex(RSA_get0_e(rsa)), MAX_LINE);
+    strncpy(n, BN_bn2hex(RSA_get0_n(rsa)), MAX_LINE);
+    strncpy(d, BN_bn2hex(RSA_get0_d(rsa)), MAX_LINE);
+
     return 0;
 }
 
@@ -44,9 +54,55 @@ int set_public(RSA *rsa, char *e, char *n) {
     return 0;
 }
 
+// set the public key from another user
+int set_private(RSA *rsa, char *e, char *n, char *d) {
+    BIGNUM *ebn = BN_new();
+    BIGNUM *nbn = BN_new();
+    BIGNUM *dbn = BN_new();
+    BN_hex2bn(&ebn, e);
+    BN_hex2bn(&nbn, n);
+    BN_hex2bn(&dbn, d);
+
+    if(nbn == NULL || ebn == NULL) return 1;
+    RSA_set0_key(rsa, nbn, ebn, dbn);
+    return 0;
+}
+
 // takes an RSA struct pointer where the keys will be stored
 int get_keys(RSA **keypair) {
-    fprintf(stderr, "Generating RSA (%d bits) keypair...", KEY_LENGTH);
+
+    if ((*keypair = RSA_new()) == NULL) {
+        log_ssl_err("RSA_new failed");
+        // BN_free(e);
+        return 1;
+    }
+
+    if (file_exists("privatekey.client")) {
+        fprintf(stderr, "Found keypair privatekey.client\n");
+
+        FILE *fptr;
+        if((fptr = fopen("privatekey.client","r")) == NULL) {
+            printf("client: could not open privatefile for writing\n");
+            
+            // Program exits if the file pointer returns NULL.
+            exit(EXIT_FAILURE);
+        }
+
+        char e[MAX_LINE]; bzero(e, MAX_LINE);
+        char n[MAX_LINE]; bzero(n, MAX_LINE);
+        char d[MAX_LINE]; bzero(d, MAX_LINE);
+
+        fscanf(fptr,"%s\n", e);
+        fscanf(fptr,"%s\n", n);
+        fscanf(fptr,"%s\n", d);
+
+        set_private(*keypair, e, n, d);
+        fclose(fptr); 
+        return 0;
+    }
+
+    // file not found, generate new keypair
+    fprintf(stderr, "Generating RSA (%d bits) keypair...\n", KEY_LENGTH);
     // Generate key pair
     BIGNUM *e;
     uint32_t exponent_bin, exponent_num;
@@ -58,17 +114,35 @@ int get_keys(RSA **keypair) {
         return 1;
     }
 
-    if ((*keypair = RSA_new()) == NULL) {
-        log_ssl_err("RSA_new failed");
-        BN_free(e);
-        return 1;
-    }
-    
     if(!RSA_generate_key_ex(*keypair, KEY_LENGTH, e, NULL)) {
         log_ssl_err("couldn't generate rsa key");
         BN_free(e);
         return 1;
     }
+
+    // write key to file
+    if (!file_exists("privatekey.client")) {
+        FILE *fptr;
+        if((fptr = fopen("privatekey.client","w")) == NULL) {
+            printf("client: could not open privatefile for writing\n");
+            
+            // Program exits if the file pointer returns NULL.
+            exit(EXIT_FAILURE);
+        }
+
+        char e[MAX_LINE]; bzero(e, MAX_LINE);
+        char n[MAX_LINE]; bzero(n, MAX_LINE);
+        char d[MAX_LINE]; bzero(d, MAX_LINE);
+        
+        get_private(*keypair, e, n, d);
+
+        fprintf(fptr,"%s\n", e);
+        fprintf(fptr,"%s\n", n);
+        fprintf(fptr,"%s\n", d);
+
+        fclose(fptr);    
+   }
+
     /* FILE *keys = fopen("keys", "w");
     fwrite(keypair, RSA_size(keypair), 1, keys); */
     return 0;

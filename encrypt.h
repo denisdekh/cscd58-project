@@ -18,6 +18,8 @@ int get_keys(RSA **keypair);
 int encrypt_message(RSA *rsa, char msg[], unsigned char ciphertext[], int msg_len, int *cipher_len);
 int decrypt_message(RSA *rsa, char ciphertext[], unsigned char *decrypted, int msg_len);
 int get_public(RSA *rsa, char *e, char *n);
+int get_private(RSA *rsa, char *e, char *n, char *d);
+
 int set_public(RSA *rsa, char *e, char *n);
 
 #endif
