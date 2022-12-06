@@ -76,6 +76,12 @@ void user_handler(char buf[MAX_LINE], int len)
     auth.password_len = strlen(password);
     strcpy(auth.username, user);
     strcpy(auth.password, password);
+
+    // get encryption keys
+    if (get_keys(auth.username, &keys) || keys == NULL) {
+        fprintf(stderr, "client: could not get encryption keys\n");
+        exit(EXIT_FAILURE);
+    }
     
     if (get_public(keys, auth.e, auth.n)) {     // get the key and set it
         fprintf(stderr, "client: could not retrieve the public key\n");
@@ -320,11 +326,6 @@ int main(int argc, char * argv[])
     // zero global variables initially
     bzero((char *) &auth, sizeof(auth));
     bzero(target_user, sizeof(target_user));
-    // get encryption keys
-    if (get_keys(&keys) || keys == NULL) {
-        fprintf(stderr, "client: could not generate encryption keys\n");
-        exit(EXIT_FAILURE);
-    }
 
     printf("Chat client started...\n");
     printf("Please authenticate using /user <user> <password>\n");

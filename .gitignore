@@ -1,4 +1,4 @@
 server
 client
 .vscode/
-privatekey.client
+*.client

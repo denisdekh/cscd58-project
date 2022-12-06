@@ -69,7 +69,7 @@ int set_private(RSA *rsa, char *e, char *n, char *d) {
 }
 
 // takes an RSA struct pointer where the keys will be stored
-int get_keys(RSA **keypair) {
+int get_keys(char *username, RSA **keypair) {
 
     if ((*keypair = RSA_new()) == NULL) {
         log_ssl_err("RSA_new failed");
@@ -77,11 +77,15 @@ int get_keys(RSA **keypair) {
         return 1;
     }
 
-    if (file_exists("privatekey.client")) {
+    char filename[MAX_LINE];
+    bzero(filename, MAX_LINE);
+    sprintf(filename, "%s-privatekey.client", username);
+
+    if (file_exists(filename)) {
         fprintf(stderr, "Found keypair privatekey.client\n");
 
         FILE *fptr;
-        if((fptr = fopen("privatekey.client","r")) == NULL) {
+        if((fptr = fopen(filename,"r")) == NULL) {
             printf("client: could not open privatefile for writing\n");
             
             // Program exits if the file pointer returns NULL.
@@ -121,9 +125,9 @@ int get_keys(RSA **keypair) {
     }
 
     // write key to file
-    if (!file_exists("privatekey.client")) {
+    if (!file_exists(filename)) {
         FILE *fptr;
-        if((fptr = fopen("privatekey.client","w")) == NULL) {
+        if((fptr = fopen(filename,"w")) == NULL) {
             printf("client: could not open privatefile for writing\n");
             
             // Program exits if the file pointer returns NULL.
