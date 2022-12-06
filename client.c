@@ -106,6 +106,9 @@ void user_handler(char buf[MAX_LINE], int len)
 
         // create get messages thread
         pthread_create(&get_msg_tid, NULL, &get_messages, NULL);
+    } else {
+        printf("Authenticated failed\n");
+        bzero(&auth, sizeof(struct D58P_auth));
     }
 }
 
@@ -191,7 +194,7 @@ void send_message_handler(char buf[MAX_LINE], int len)
     struct D58P_message_data data;
 
     // not authenticated
-    if(auth.user_len == 0 || auth.password_len == 0) {
+    if(authenticated && auth.user_len == 0 || auth.password_len == 0) {
         printf("Authenticate using /user <user> <password>\n");
         return;
     }
