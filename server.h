@@ -15,6 +15,9 @@ struct user {
     char password[MAX_LINE];    // password of user
 
     struct user *next;          // next user in user list
+
+    char e[KEY_LENGTH];         // public key values
+    char n[KEY_LENGTH];
 };
 
 struct message {
