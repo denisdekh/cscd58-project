@@ -159,6 +159,10 @@ int key_handler() {
     All further messages should be directed to specified user*/
 void msg_handler(char buf[MAX_LINE], int len)
 {
+    if (!authenticated) {
+        printf("Please log in first\n");
+        return;
+    }
     const char delim[] = " ";
     strtok(buf, delim); // command
     char *user = strtok(NULL, delim); // arg1
