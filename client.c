@@ -37,7 +37,7 @@ void* get_messages(void *aux)
             unsigned char *bin = OPENSSL_hexstr2buf(message, &buflen);
 
             unsigned char plaintext[MAX_LINE];
-            int plain_len = decrypt_message(keys, message, plaintext, 256);
+            int plain_len = decrypt_message(keys, bin, plaintext, 256);
             plaintext[plain_len] = '\0';
 
             // print the message
@@ -225,7 +225,7 @@ void send_message_handler(char buf[MAX_LINE], int len)
     sprintf(final, "%d|delim|", cipher_len);
     strncat(final, hex, MAX_LINE - strlen(final)); */
 
-    // set message content
+    // set message content strlen(hex)
     memcpy(data.message, hex, strlen(hex));
     data.message_len = strlen(hex);
 
