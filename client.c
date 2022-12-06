@@ -26,10 +26,23 @@ void* get_messages(void *aux)
             int code = atoi(res.lines[1]);
             char *from = res.lines[2];
             char *message = res.lines[3];
+/* 
+            const char delim[] = "|delim|";
+            char *cipher_len_str = strtok(message, delim); // command 
+            int cipher_len = atoi(cipher_len_str);
+            char *hex = strtok(NULL, delim);
+            
+            */
+            long buflen = (long) strlen(message); 
+            unsigned char *bin = OPENSSL_hexstr2buf(message, &buflen);
+
+            unsigned char plaintext[MAX_LINE];
+            int plain_len = decrypt_message(keys, message, plaintext, 256);
+            plaintext[plain_len] = '\0';
 
             // print the message
             if(code == D58P_OK) {
-                printf("%s: %s\n", from, message);
+                printf("%s: %s\n", from, plaintext);
             }
         }
     }
@@ -171,8 +184,6 @@ void msg_handler(char buf[MAX_LINE], int len)
     }
 }
 
-
-
 /*
     should communicate with server to send message to user
 
@@ -200,10 +211,23 @@ void send_message_handler(char buf[MAX_LINE], int len)
     if (len <= 1) return;
 
     strncpy(data.target_user, target_user, data.target_user_len);
+    len -= 1;
+    buf[len] = '\0'; // dont copy the \n at the end
+
+    // encrypt the message
+    unsigned char ciphertext[MAX_LINE];
+    int cipher_len;
+    encrypt_message(target_key, buf, ciphertext, len, &cipher_len);
+    
+    char *hex = OPENSSL_buf2hexstr(ciphertext, (long)cipher_len);
+    /* 
+    char final[MAX_LINE];
+    sprintf(final, "%d|delim|", cipher_len);
+    strncat(final, hex, MAX_LINE - strlen(final)); */
 
     // set message content
-    memcpy(data.message, buf, len);
-    data.message_len = len - 1; // dont copy the \n at the end
+    memcpy(data.message, hex, strlen(hex));
+    data.message_len = strlen(hex);
 
     // build message request from message data
     struct D58P req, res;
@@ -318,7 +342,7 @@ int main(int argc, char * argv[])
 }
 
 
-    /* encryption test
+    /* //encryption test
     RSA *new;
     get_keys(&new);
 
