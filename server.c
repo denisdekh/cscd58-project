@@ -439,7 +439,7 @@ void get_key_handler(int client_socket, struct D58P *req, int len)
         return;
     }
 
-    struct user *target_user_st = find_user(username);
+    struct user *target_user_st = find_user(target_user);
 
     char *e = target_user_st->e;
     char *n = target_user_st->n;

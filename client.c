@@ -26,10 +26,18 @@ void* get_messages(void *aux)
             int code = atoi(res.lines[1]);
             char *from = res.lines[2];
             char *message = res.lines[3];
+            
+            //convert from hex
+            long buflen = (long) strlen(message); 
+            unsigned char *bin = OPENSSL_hexstr2buf(message, &buflen);
+
+            unsigned char plaintext[MAX_LINE];
+            int plain_len = decrypt_message(keys, bin, plaintext, 256);
+            plaintext[plain_len] = '\0';
 
             // print the message
             if(code == D58P_OK) {
-                printf("%s: %s\n", from, message);
+                printf("%s: %s\n", from, plaintext);
             }
         }
     }
@@ -171,8 +179,6 @@ void msg_handler(char buf[MAX_LINE], int len)
     }
 }
 
-
-
 /*
     should communicate with server to send message to user
 
@@ -200,10 +206,19 @@ void send_message_handler(char buf[MAX_LINE], int len)
     if (len <= 1) return;
 
     strncpy(data.target_user, target_user, data.target_user_len);
+    len -= 1;
+    buf[len] = '\0'; // dont copy the \n at the end
 
-    // set message content
-    memcpy(data.message, buf, len);
-    data.message_len = len - 1; // dont copy the \n at the end
+    // encrypt the message
+    unsigned char ciphertext[MAX_LINE];
+    int cipher_len;
+    encrypt_message(target_key, buf, ciphertext, len, &cipher_len);
+    
+    // convert to hex
+    char *hex = OPENSSL_buf2hexstr(ciphertext, (long)cipher_len);
+    int hex_len = strlen(hex);
+    memcpy(data.message, hex, hex_len);
+    data.message_len = hex_len;
 
     // build message request from message data
     struct D58P req, res;
@@ -316,21 +331,3 @@ int main(int argc, char * argv[])
     // main client loop
     while (1) client_loop();
 }
-
-
-    /* encryption test
-    RSA *new;
-    get_keys(&new);
-
-    set_public(new, auth.e, auth.n);
-    
-    unsigned char msg[] = "hmm very long msh jdnajdijsahdjashdijsahdisajdasdsadsadsadsadsasadasdssadsadasdasas";
-    unsigned char ciphertext[RSA_size(new)];
-    int cipher_len;
-    encrypt_message(new, msg, ciphertext, strlen(msg), &cipher_len);
-    fprintf(stderr, "client: the original message = '%s' length = %ld\n", msg, strlen(msg));
-
-    unsigned char plaintext[RSA_size(keys)];
-    int plain_len = decrypt_message(keys, ciphertext, plaintext, cipher_len);
-    plaintext[plain_len] = '\0';
-    fprintf(stderr, "client: the decrypted message = '%s' length = %ld\n", plaintext, strlen(plaintext)); */

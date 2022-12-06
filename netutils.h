@@ -11,7 +11,7 @@
 
 #define MAX_REQUEST 4096    // maximum # of bytes for request
 #define MAX_LINES 50        // maximum # of lines for request
-#define MAX_LINE 1024        // maximum # of bytes per line
+#define MAX_LINE 4096        // maximum # of bytes per line
 
 /*
  D58P: D58 Protocol definitions

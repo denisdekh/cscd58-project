@@ -220,6 +220,7 @@ void create_message_request(struct D58P *req, struct D58P_auth *auth, struct D58
 
     // set message
     strncat(req->lines[4], data->message, data->message_len);
+
 }
 
 /*
