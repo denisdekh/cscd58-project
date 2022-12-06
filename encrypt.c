@@ -29,7 +29,7 @@ void log_ssl_err(const char *mes)
 int get_public(RSA *rsa, char *e, char *n) {
     strncpy(e, BN_bn2hex(RSA_get0_e(rsa)), MAX_LINE);
     strncpy(n, BN_bn2hex(RSA_get0_n(rsa)), MAX_LINE);
-    printf("Copied keys: e = %s and n = %s\n", e, n);
+    //printf("Copied keys: e = %s and n = %s\n", e, n);
     return 0;
 }
 
@@ -39,6 +39,7 @@ int set_public(RSA *rsa, char *e, char *n) {
     BIGNUM *nbn = BN_new();
     BN_hex2bn(&ebn, e);
     BN_hex2bn(&nbn, n);
+    if(nbn == NULL || ebn == NULL) return 1;
     RSA_set0_key(rsa, nbn, ebn, NULL);
     return 0;
 }

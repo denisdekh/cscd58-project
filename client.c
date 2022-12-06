@@ -3,6 +3,7 @@
 /* global variables */
 struct sockaddr_in server_addr;     // server address struct
 char target_user[MAX_LINE];
+char target_key_name[MAX_LINE];
 struct D58P_auth auth;
 int authenticated;              // client side flag to determine if authenticated
 pthread_t get_msg_tid;
@@ -140,10 +141,61 @@ void msg_handler(char buf[MAX_LINE], int len)
 
         int target_user_len = strnlen(user, MAX_LINE) - 1; // dont copy the \n at the end
 
+        if(target_key_name == NULL || strncmp(target_key_name, user, MAX_LINE)) {
+            if (key_handler()) { 
+                printf("Could not retrieve the key of user %s\n", user);
+                return;
+            }
+        }
+
         strncpy(target_user, user, target_user_len);
         target_user[target_user_len] = '\0'; // in case the new target's name is shorter than previous
+        
         printf("Now chatting with %s", user);
     }
+}
+
+/*  Send request to the server of the form
+    D58P /Get Key
+    <user>
+    <target_user>
+    
+    Then saves the key and the name of the target_user to keep track of the current key*/
+int key_handler() {
+    if(authenticated) {
+        // build get message request
+        struct D58P req, res;
+        create_get_key_request(&req, &auth);
+
+        int res_len = send_D58P_request(&server_addr, &req, &res);
+        int code = atoi(res.lines[1]);
+        
+        if(code == D58P_OK) {
+            char *key_for = res.lines[3];
+            char *e = res.lines[4];
+            char *n = res.lines[5];
+            if (set_public(target_key, e, n)) {  return 1; }
+            strncpy(target_key_name, key_for, MAX_LINE);
+            return 0;
+        } else {
+            return 1;
+        }
+    }
+}
+
+void create_get_key_request(struct D58P *req, struct D58P_auth *auth)
+{
+    // zero the struct
+    bzero(req, sizeof(struct D58P));
+
+    // set request type
+    strncpy(req->lines[0], D58P_GET_KEY_REQ, sizeof(D58P_GET_KEY_REQ));
+
+    // set username
+    strncpy(req->lines[1], auth->username, auth->user_len);
+
+    // set target user
+    strncpy(req->lines[2], target_user, strlen(target_user));
 }
 /*
     should communicate with server to send message to user

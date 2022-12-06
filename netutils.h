@@ -23,6 +23,8 @@
 #define D58P_USER_STRING_REQ "D58P /User"
 #define D58P_USER_STRING_RES "D58P \\User"
 #define D58P_ERROR_STRING "D58P \\Error"
+#define D58P_GET_KEY_REQ "D58P /Get Key"
+#define D58P_GET_KEY_RES "D58P \\Get Key"
 
 #define D58P_ACK_STRING "D58P /Acknowledge"
 
