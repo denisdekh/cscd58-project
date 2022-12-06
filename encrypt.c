@@ -27,8 +27,8 @@ void log_ssl_err(const char *mes)
 
 // get the public key values to be sent to another user
 int get_public(RSA *rsa, char *e, char *n) {
-    strncpy(e, BN_bn2hex(RSA_get0_e(rsa)), MAX_REQUEST);
-    strncpy(n, BN_bn2hex(RSA_get0_n(rsa)), MAX_REQUEST);
+    strncpy(e, BN_bn2hex(RSA_get0_e(rsa)), MAX_LINE);
+    strncpy(n, BN_bn2hex(RSA_get0_n(rsa)), MAX_LINE);
     //printf("Copied keys: e = %s and n = %s\n", e, n);
     return 0;
 }

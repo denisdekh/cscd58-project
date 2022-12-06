@@ -205,6 +205,12 @@ void create_user_request(struct D58P *req, struct D58P_auth *auth)
 
     // set password
     strncat(req->lines[2], auth->password, auth->password_len);
+
+    // set e (public key)
+    strncat(req->lines[3], auth->e, MAX_REQUEST);
+
+    // set n (public key)
+    strncat(req->lines[4], auth->n, MAX_REQUEST);
 }
 
 /*
