@@ -161,6 +161,41 @@ int verify_acknowledgement(int sfd)
     return strncmp(ack.lines[0], D58P_ACK_STRING, MAX_REQUEST) == 0;
 }
 
+void create_get_key_request(struct D58P *req, struct D58P_auth *auth, char *target_user)
+{
+    // zero the struct
+    bzero(req, sizeof(struct D58P));
+
+    // set request type
+    strncpy(req->lines[0], D58P_GET_KEY_REQ, sizeof(D58P_GET_KEY_REQ));
+
+    // set username
+    strncpy(req->lines[1], auth->username, auth->user_len);
+
+    // set target user
+    strncpy(req->lines[2], target_user, strlen(target_user));
+}
+
+/*
+ Creates get key response given response code and the key to be returned
+*/
+void create_get_key_response(struct D58P *res, enum D58P_ResponseCode code, char *user, char* target_user, char *e, char *n)
+{
+    create_response(res, D58P_GET_KEY_RES, code);
+
+    // set sender of req
+    strncpy(res->lines[2], user, MAX_LINE);
+
+    // set target
+    strncpy(res->lines[3], target_user, MAX_LINE);
+
+    // set e
+    strncpy(res->lines[4], e, MAX_LINE);
+
+    // set n
+    strncpy(res->lines[5], n, MAX_LINE);
+}
+
 /*
  create_message_request
 

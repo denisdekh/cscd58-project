@@ -206,6 +206,8 @@ int is_authenticated(char *username, char *password)
     D58P /User
     <user>
     <password>
+    <e>
+    <n>
 */
 void user_handler(int client_socket, struct D58P *req, int len)
 {
@@ -411,6 +413,46 @@ void get_message_handler(int client_socket, struct D58P *req, int len)
 }
 
 /*
+ get_message_handler
+
+ Handles logic to be performed on a get message request
+
+ Handles D58P /Get Message requests
+
+ D58P Message request form:
+    D58P /Message
+    <user>
+    <password>
+*/
+void get_key_handler(int client_socket, struct D58P *req, int len)
+{
+    struct D58P res;
+    bzero(&res, sizeof(struct D58P));
+
+    char *username = req->lines[1];
+    char *target_user = req->lines[2];
+
+    // bad request if any fields empty
+    if(is_empty(username) || is_empty(target_user)) {
+        create_response(&res, D58P_GET_KEY_RES, D58P_BAD_REQUEST);
+        send_D58P_response(client_socket, &res);
+        return;
+    }
+
+    struct user *target_user_st = find_user(username);
+
+    char *e = target_user_st->e;
+    char *n = target_user_st->n;
+
+    // reply with the key
+    create_get_key_response(&res, D58P_OK, username, target_user, e, n);
+    send_D58P_response(client_socket, &res);
+
+    // verify acknowledgement
+    verify_acknowledgement(client_socket);
+}
+
+/*
  Handles a connection from a client
 */
 void *handle_connection(void *arg)
@@ -435,6 +477,8 @@ void *handle_connection(void *arg)
         user_handler(client_socket, &req, len);
     } else if (strncmp(req.lines[0], D58P_GET_MESSAGE_STRING_REQ, MAX_REQUEST) == 0) {
         get_message_handler(client_socket, &req, len);
+    } else if (strncmp(req.lines[0], D58P_GET_KEY_REQ, MAX_REQUEST) == 0) {
+        get_key_handler(client_socket, &req, len);
     } else {
         printf("Invalid request\n");
         char reply_buf[MAX_REQUEST] = "Invalid request\n";
