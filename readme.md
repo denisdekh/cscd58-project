@@ -28,9 +28,9 @@ Example: ```$ ./client localhost ```
 
 ## To do list:
 
-- create a applicaltion layer protocol over TCP that the client/server will use to communicate. Can just use HTTP if you would like. 
+- create a application layer protocol over TCP that the client/server will use to communicate. Can just use HTTP if you would like. 
 
-    we will use whatever protcol is chosen/designed to make requests from the client such as
+    we will use whatever protocol is chosen/designed to make requests from the client such as
 
     - send message
     - register
