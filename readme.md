@@ -1,3 +1,8 @@
+## Team Members
+| Full Name | Github|
+|-----------|--------|
+|Joshua Carrasco Sousa | [Github](https://github.com/asdwhy) |
+
 ## Compiling
 To compile the client and server run
 
