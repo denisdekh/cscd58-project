@@ -1,9 +1,9 @@
 
 ## Team Members
-| Full Name | Github| LinkedIn|
-|-----------|--------|-----------------|
-| Denis Dekhtyarenko | [Github](https://github.com/Umenemo) | [LinkedIn](https://www.linkedin.com/in/denis-dekhtyarenko-522a90210/)
-|Joshua Carrasco Sousa | [Github](https://github.com/asdwhy) | [LinkedIn](https://www.linkedin.com/in/joshua-carrasco-sousa/)
+| Full Name | Profiles |
+|-----------|-------------------------|
+| Denis Dekhtyarenko | [Github](https://github.com/Umenemo) &nbsp;&nbsp;&nbsp;&nbsp; [LinkedIn](https://www.linkedin.com/in/denis-dekhtyarenko-522a90210/)
+|Joshua Carrasco Sousa | [Github](https://github.com/asdwhy) &nbsp;&nbsp;&nbsp;&nbsp; [LinkedIn](https://www.linkedin.com/in/joshua-carrasco-sousa/)
 
 ## Compiling
 To compile the client and server run
