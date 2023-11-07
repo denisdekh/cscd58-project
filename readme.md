@@ -2,7 +2,7 @@
 ## Team Members
 | Full Name | Profiles |
 |-----------|-------------------------|
-| Denis Dekhtyarenko | [Github](https://github.com/Umenemo) &nbsp;&nbsp;&nbsp;&nbsp; [LinkedIn](https://www.linkedin.com/in/denis-dekhtyarenko-522a90210/)
+| Denis Dekhtyarenko | [Github](https://github.com/denisdekh) &nbsp;&nbsp;&nbsp;&nbsp; [LinkedIn](https://www.linkedin.com/in/denis-dekh)
 |Joshua Carrasco Sousa | [Github](https://github.com/asdwhy) &nbsp;&nbsp;&nbsp;&nbsp; [LinkedIn](https://www.linkedin.com/in/joshua-carrasco-sousa/)
 
 ## Compiling
